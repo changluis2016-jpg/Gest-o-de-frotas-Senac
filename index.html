@@ -94,7 +94,7 @@
         Senac MT — Sistema Integrado de Gestão de Frotas &copy; 2026
     </footer>
 
-    <!-- Script Robusto por Mapeamento Completo de Colunas -->
+    <!-- Script Robusto para Conversão de Datas do Excel/AppSheet -->
     <script>
         const FROTA_OFICIAL = ["ONIX-7B64", "ONIX-3G84", "L200"];
         let dadosGlobais = [];
@@ -128,10 +128,45 @@
             return String(str).trim().toUpperCase().replace(/\s+/g, '');
         }
 
+        // Converte números seriais do Excel, strings ISO ou formato brasileiro para YYYY-MM-DD
+        function normalizarDataParaIso(dataBruta) {
+            if (dataBruta === null || dataBruta === undefined || dataBruta === "") return "";
+            let str = String(dataBruta).trim();
+
+            // Se for número serial do Excel (ex: 45928)
+            const num = Number(str);
+            if (!isNaN(num) && num > 30000 && num < 60000) {
+                const dataExcel = new Date(Math.round((num - (25567 + 2)) * 86400 * 1000));
+                if (!isNaN(dataExcel.getTime())) {
+                    const ano = dataExcel.getUTCFullYear();
+                    const mes = String(dataExcel.getUTCMonth() + 1).padStart(2, '0');
+                    const dia = String(dataExcel.getUTCDate()).padStart(2, '0');
+                    return `${ano}-${mes}-${dia}`;
+                }
+            }
+
+            // Se vier formato ISO (2026-09-28T00:00:00)
+            if (str.includes('T')) {
+                return str.split('T')[0];
+            }
+
+            // Se vier no formato brasileiro (DD/MM/YYYY)
+            if (str.includes('/')) {
+                const partes = str.split('/');
+                if (partes.length === 3) {
+                    let dia = partes[0].padStart(2, '0');
+                    let mes = partes[1].padStart(2, '0');
+                    let ano = partes[2];
+                    return `${ano}-${mes}-${dia}`;
+                }
+            }
+
+            return str.substring(0, 10);
+        }
+
         function formatarDataBR(dataIso) {
-            if (!dataIso) return "-";
-            const parteData = String(dataIso).split('T')[0];
-            const partes = parteData.split('-');
+            const isoLimpo = normalizarDataParaIso(dataIso);
+            const partes = isoLimpo.split('-');
             if (partes.length === 3) {
                 return `${partes[2]}/${partes[1]}/${partes[0]}`;
             }
@@ -171,35 +206,29 @@
             return strHora;
         }
 
-        // Função auxiliar para encontrar propriedades no objeto JSON independentemente de maiúsculas, acentos ou ordem
         function extrairCampo(item, chavesPossiveis, indiceArrayFallback) {
             const chavesItem = Object.keys(item);
-            
-            // 1. Tentar encontrar por nome correspondente
             for (let chaveP of chavesPossiveis) {
                 const chaveEncontrada = chavesItem.find(k => limparStr(k) === limparStr(chaveP) || limparStr(k).includes(limparStr(chaveP)));
                 if (chaveEncontrada && item[chaveEncontrada] !== undefined && item[chaveEncontrada] !== "") {
                     return item[chaveEncontrada];
                 }
             }
-
-            // 2. Fallback por índice no array de valores (caso o JSON venha como array plano ou objeto indexado)
             const valoresArray = Object.values(item);
             if (valoresArray[indiceArrayFallback] !== undefined) {
                 return valoresArray[indiceArrayFallback];
             }
-
             return "";
         }
 
         function atualizarPainel() {
-            const dataSelecionada = document.getElementById('filtro-data').value;
+            const dataSelecionada = document.getElementById('filtro-data').value; // YYYY-MM-DD
             const termoBusca = document.getElementById('busca-geral').value.toLowerCase();
 
             const agendamentosDoDia = dadosGlobais.filter(item => {
                 const dataBruta = extrairCampo(item, ["Data", "Date", "Dia"], 0);
-                const dataItem = String(dataBruta).split('T')[0];
-                return dataItem === dataSelecionada;
+                const dataItemIso = normalizarDataParaIso(dataBruta);
+                return dataItemIso === dataSelecionada;
             });
 
             const veiculosOcupados = new Set();
