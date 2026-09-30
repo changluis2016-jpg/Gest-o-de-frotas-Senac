@@ -167,27 +167,42 @@
 
         // Formatação inteligente para horas decimais do Excel (ex: 0.5 -> 12:00, 0.72916... -> 17:30)
         function formatarHora(valorHora) {
-            if (valorHora === null || valorHora === undefined || valorHora === "") return "-";
-            let strHora = String(valorHora).trim();
-            if (strHora === "0" || strHora === "0.0" || strHora === "--") return "00:00";
+    if (valorHora === null || valorHora === undefined || valorHora === "") return "-";
+    let strHora = String(valorHora).trim();
+    if (strHora === "0" || strHora === "0.0" || strHora === "--") return "00:00";
 
-            if (strHora.includes('T')) {
-                const partesT = strHora.split('T');
-                if (partesT[1] && partesT[1].substring(0, 5) !== "00:00") return partesT[1].substring(0, 5);
-            }
-
-            const num = Number(strHora);
-            if (!isNaN(num) && num >= 0 && num <= 1) {
-                const totalMinutos = Math.round(num * 24 * 60);
-                const horas = Math.floor(totalMinutos / 60);
-                const minutos = totalMinutos % 60;
-                return `${String(horas).padStart(2, '0')}:${String(minutos).padStart(2, '0')}`;
-            }
-
-            if (strHora.length >= 5) return strHora.substring(0, 5);
-            return strHora;
+    // Se vier no formato ISO completo (ex: 2026-09-28T15:00:00.000Z ou similar)
+    if (strHora.includes('T')) {
+        const partesT = strHora.split('T');
+        if (partesT[1]) {
+            return partesT[1].substring(0, 5); // Pega apenas HH:MM
         }
+    }
 
+    // Se vier com o ano corrompido do Excel (ex: começa com 1899, 1900, 1901, etc.)
+    if (strHora.startsWith('1899') || strHora.startsWith('1900') || strHora.startsWith('1901') || strHora.startsWith('1908')) {
+        if (strHora.includes('T')) {
+            const horaPart = strHora.split('T')[1];
+            if (horaPart) return horaPart.substring(0, 5);
+        }
+    }
+
+    // Se for número decimal do Excel (ex: 0.5)
+    const num = Number(strHora);
+    if (!isNaN(num) && num >= 0 && num < 1) {
+        const totalMinutos = Math.round(num * 24 * 60);
+        const horas = Math.floor(totalMinutos / 60);
+        const minutos = totalMinutos % 60;
+        return `${String(horas).padStart(2, '0')}:${String(minutos).padStart(2, '0')}`;
+    }
+
+    // Se já estiver limpo no formato HH:MM ou HH:MM:SS
+    if (strHora.length >= 5 && strHora.includes(':')) {
+        return strHora.substring(0, 5);
+    }
+
+    return strHora;
+}
         function atualizarPainel() {
             const dataSelecionada = document.getElementById('filtro-data').value;
             const termoBusca = document.getElementById('busca-geral').value.toLowerCase();
