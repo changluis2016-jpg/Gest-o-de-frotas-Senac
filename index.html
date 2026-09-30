@@ -179,8 +179,8 @@
                 }
             }
 
-            // Se já estiver no formato HH:MM:SS ou HH:MM
-            if (strHora.includes(':')) {
+            // Validação padrão de formato de hora
+            if (strHora.indexOf(':') !== -1) {
                 return strHora.substring(0, 5);
             }
 
