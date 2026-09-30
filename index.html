@@ -104,7 +104,6 @@
         const inputData = document.getElementById('filtro-data');
         if (inputData) inputData.value = hojeStr;
 
-        // Carregar dados do data.json
         async function carregarDados() {
             try {
                 const resposta = await fetch('data.json?' + new Date().getTime());
@@ -132,8 +131,8 @@
             return String(txt).trim().toUpperCase();
         }
 
-        function normalizarDataParaIso(dataBruta) {
-            if (!dataBruta) return "";
+        function obterDataIso(item) {
+            const dataBruta = item["Data"] || item["Date"] || item["Dia"] || "";
             let str = String(dataBruta).trim();
 
             if (str.includes('T')) {
@@ -155,44 +154,27 @@
             return str.substring(0, 10);
         }
 
-        function formatarDataBR(dataIso) {
-            const iso = normalizarDataParaIso(dataIso);
+        function formatarDataBR(item) {
+            const iso = obterDataIso(item);
             const p = iso.split('-');
-            return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : dataIso;
+            return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : iso;
         }
 
-        // Conversor de horários garantindo precisão para Excel/SharePoint
-        function formatarHora(valor) {
-            if (valor === null || valor === undefined || valor === "") return "-";
-            let vStr = String(valor).trim();
-            if (vStr === "0" || vStr === "0.0" || vStr === "--" || vStr === "NaN") return "00:00";
-
-            // Se vier em formato ISO com 'T' (ex: 2026-03-30T08:30:00)
-            if (vStr.includes('T')) {
-                const ped = vStr.split('T');
-                if (ped[1]) {
-                    // Trata UTC convertendo corretamente para horário local se necessário, ou pega os primeiros dígitos
-                    const subHora = ped[1].substring(0, 5);
-                    // Se houver offset Z, ajusta para o horário correto local se vier shiftado
-                    return subHora;
-                }
+        // Pega direto da Coluna1 e Coluna2 (ou faz fallback se não achar)
+        function formatarHora(valorColunaTexto, valorDireto) {
+            if (valorColunaTexto !== null && valorColunaTexto !== undefined && String(valorColunaTexto).trim() !== "") {
+                let vTxt = String(valorColunaTexto).trim();
+                if (vTxt.length >= 5) return vTxt.substring(0, 5);
+                return vTxt;
             }
 
-            // Se vier no formato texto padrão (HH:MM ou HH:MM:SS)
+            if (valorDireto === null || valorDireto === undefined || valorDireto === "") return "-";
+            let vStr = String(valorDireto).trim();
+            if (vStr === "0" || vStr === "0.0" || vStr === "--" || vStr === "NaN") return "--";
+
             const matchHora = vStr.match(/^(\d{1,2}):(\d{2})/);
             if (matchHora) {
-                const h = matchHora[1].padStart(2, '0');
-                const m = matchHora[2];
-                return `${h}:${m}`;
-            }
-
-            // Se vier como número decimal do Excel (fração de 24 horas)
-            const nDecimal = Number(vStr);
-            if (!isNaN(nDecimal) && nDecimal >= 0 && nDecimal < 1) {
-                const mTotal = Math.round(nDecimal * 24 * 60);
-                const h = Math.floor(mTotal / 60);
-                const m = mTotal % 60;
-                return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+                return `${matchHora[1].padStart(2, '0')}:${matchHora[2]}`;
             }
 
             return vStr;
@@ -202,13 +184,10 @@
             const dataSelecionada = document.getElementById('filtro-data').value;
             const termoBusca = document.getElementById('busca-geral').value.toLowerCase();
 
-            // Filtrar agendamentos que caem na data selecionada
             const agendamentosDoDia = dadosGlobais.filter(item => {
-                const dataItemIso = normalizarDataParaIso(item["Data"] || item["Date"] || item["Dia"]);
-                return dataItemIso === dataSelecionada;
+                return obterDataIso(item) === dataSelecionada;
             });
 
-            // Identificar quais veículos da frota oficial estão ocupados nesta data
             const veiculosOcupados = new Set();
             agendamentosDoDia.forEach(item => {
                 const veiculoNome = normalizarTexto(item["Veículo"] || item["Veiculo"]);
@@ -219,7 +198,6 @@
                 });
             });
 
-            // Renderizar Cards dos 3 Veículos
             const gridVeiculos = document.getElementById('grid-veiculos');
             gridVeiculos.innerHTML = '';
 
@@ -244,13 +222,11 @@
                 gridVeiculos.appendChild(card);
             });
 
-            // Filtrar tabela com base na busca geral
             const agendamentosFiltrados = agendamentosDoDia.filter(item => {
                 const linhaStr = JSON.stringify(item).toLowerCase();
                 return linhaStr.includes(termoBusca);
             });
 
-            // Renderizar Tabela
             const tbody = document.getElementById('tabela-agendamentos');
             tbody.innerHTML = '';
             document.getElementById('contador-agendamentos').innerText = `${agendamentosFiltrados.length} agendamento(s) encontrado(s)`;
@@ -264,13 +240,15 @@
                 const tr = document.createElement('tr');
                 tr.className = "hover:bg-gray-50/80 transition-colors";
 
-                const horaInicio = formatarHora(item["Horário Início"] || item["Horario Inicio"] || item["Início"] || item["Inicio"]);
-                const horaFim = formatarHora(item["Horário Fim"] || item["Horario Fim"] || item["Fim"]);
+                // Lê diretamente da Coluna1 e Coluna2 da sua planilha
+                const horaInicio = formatarHora(item["Coluna1"], item["Horário Início"] || item["Horario Inicio"]);
+                const horaFim = formatarHora(item["Coluna2"], item["Horário Fim"] || item["Horario Fim"]);
+
                 const veiculoNome = item["Veículo"] || item["Veiculo"] || "-";
                 const motoristaNome = item["Motorista/Solicitante"] || item["Motorista"] || item["Solicitante"] || "-";
 
                 tr.innerHTML = `
-                    <td class="py-4 px-6 text-gray-600">${formatarDataBR(item["Data"] || item["Date"])}</td>
+                    <td class="py-4 px-6 text-gray-600">${formatarDataBR(item)}</td>
                     <td class="py-4 px-6 font-semibold text-gray-900">${veiculoNome}</td>
                     <td class="py-4 px-6 text-gray-700">${motoristaNome}</td>
                     <td class="py-4 px-6 text-gray-600">${horaInicio}</td>
@@ -285,11 +263,9 @@
             });
         }
 
-        // Eventos de filtro
         document.getElementById('filtro-data').addEventListener('change', atualizarPainel);
         document.getElementById('busca-geral').addEventListener('input', atualizarPainel);
 
-        // Inicializar
         carregarDados();
         setInterval(carregarDados, 300000);
     </script>
