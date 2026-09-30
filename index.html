@@ -48,7 +48,7 @@
             </div>
         </div>
 
-        <!-- Painel de Diagnóstico Visual (para ver o que está a acontecer) -->
+        <!-- Painel de Diagnóstico Visual -->
         <div id="painel-diagnostico" class="bg-blue-50 border border-blue-200 text-blue-900 px-4 py-3 rounded-xl mb-6 text-xs font-mono hidden">
             <strong>Diagnóstico:</strong> <span id="txt-diag">A carregar dados...</span>
         </div>
@@ -99,12 +99,11 @@
         Senac MT — Sistema Integrado de Gestão de Frotas &copy; 2026
     </footer>
 
-    <!-- Script Completo Definitivo -->
+    <!-- Script Corrigido contra Fuso Horário UTC -->
     <script>
         const FROTA_OFICIAL = ["ONIX-7B64", "ONIX-3G84", "L200"];
         let dadosGlobais = [];
 
-        // Inicializa o input com a data atual se estiver vazio
         window.addEventListener('DOMContentLoaded', () => {
             const inputData = document.getElementById('filtro-data');
             if (inputData && !inputData.value) {
@@ -116,9 +115,8 @@
 
         async function carregarDados() {
             try {
-                // Adiciona timestamp para evitar cache do GitHub Pages
                 const resposta = await fetch('data.json?t=' + new Date().getTime());
-                if (!resposta.ok) throw new Error('Ficheiro data.json não encontrado na raiz do repositório.');
+                if (!resposta.ok) throw new Error('Ficheiro data.json não encontrado.');
                 
                 const json = await resposta.json();
                 
@@ -131,7 +129,7 @@
                     dadosGlobais = chaveArray ? json[chaveArray] : [];
                 }
                 
-                mostrarMensagemDiagnostico(`Total de registos carregados: ${dadosGlobais.length}. Primeira chave encontrada: ${JSON.stringify(dadosGlobais[0] || {})}`);
+                mostrarMensagemDiagnostico(`Total de registos carregados: ${dadosGlobais.length}. Data pura detetada: ${JSON.stringify(extrairCampo(dadosGlobais[0], ["Data", "Date", "Dia"], 0))}`);
                 atualizarPainel();
             } catch (erro) {
                 console.error("Erro:", erro);
@@ -154,9 +152,15 @@
             return String(str).trim().toUpperCase().replace(/\s+/g, '');
         }
 
+        // CORREÇÃO CRUCIAL: Extrai estritamente os primeiros 10 carateres (YYYY-MM-DD) sem conversão de fuso horário local
         function normalizarDataParaIso(dataBruta) {
             if (dataBruta === null || dataBruta === undefined || dataBruta === "") return "";
             let str = String(dataBruta).trim();
+
+            // Se vier no formato ISO com 'T' (ex: 2026-06-22T00:00:00.000Z), cortamos diretamente a parte da data
+            if (str.includes('T')) {
+                return str.substring(0, 10);
+            }
 
             // Formato número serial do Excel
             const num = Number(str);
@@ -168,11 +172,6 @@
                     const dia = String(dataExcel.getUTCDate()).padStart(2, '0');
                     return `${ano}-${mes}-${dia}`;
                 }
-            }
-
-            // Formato ISO com T (ex: 2026-09-28T00:00:00)
-            if (str.includes('T')) {
-                return str.split('T')[0];
             }
 
             // Formato brasileiro DD/MM/YYYY ou DD-MM-YYYY
@@ -203,7 +202,7 @@
         function formatarHoraExcel(valorHora) {
             if (valorHora === null || valorHora === undefined || valorHora === "") return "-";
             let strHora = String(valorHora).trim();
-            if (strHora === "0" || strHora === "0.0" || strHora === "--") return "-";
+            if (strHora === "0" || strHora === "0.0" || strHora === "--" || strHora.includes("1908-")) return "-";
 
             if (strHora.includes('T')) {
                 const partesT = strHora.split('T');
@@ -246,7 +245,7 @@
             const dataSelecionada = inputData ? inputData.value : '';
             const termoBusca = document.getElementById('busca-geral').value.toLowerCase();
 
-            // Filtro por data
+            // Filtro por data rigoroso
             const agendamentosDoDia = dadosGlobais.filter(item => {
                 const dataBruta = extrairCampo(item, ["Data", "Date", "Dia"], 0);
                 const dataItemIso = normalizarDataParaIso(dataBruta);
@@ -331,12 +330,10 @@
             });
         }
 
-        // Eventos dinâmicos em tempo real
         document.getElementById('filtro-data').addEventListener('change', atualizarPainel);
         document.getElementById('filtro-data').addEventListener('input', atualizarPainel);
         document.getElementById('busca-geral').addEventListener('input', atualizarPainel);
 
-        // Atualização automática a cada 5 minutos
         setInterval(carregarDados, 300000);
     </script>
 </body>
