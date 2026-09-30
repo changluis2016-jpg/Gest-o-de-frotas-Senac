@@ -171,20 +171,17 @@
             let strHora = String(valorHora).trim();
             if (strHora === "0" || strHora === "0.0" || strHora === "--") return "00:00";
 
-            // Se vier em formato completo ISO com 'T'
             if (strHora.includes('T')) {
                 const partesT = strHora.split('T');
-                if (partesT[1]) {
-                    return partesT[1].substring(0, 5);
-                }
+                if (partesT[1]) return partesT[1].substring(0, 5);
             }
 
-            // Validação padrão de formato de hora
-            if (strHora.indexOf(':') !== -1) {
-                return strHora.substring(0, 5);
+            // Tratamento otimizado sem texto duplicado
+            const matchHora = strHora.match(/^(\d{2}):(\d{2})/);
+            if (matchHora) {
+                return `${matchHora[1]}:${matchHora[2]}`;
             }
 
-            // Se vier como número decimal do Excel
             const num = Number(strHora);
             if (!isNaN(num) && num >= 0 && num < 1) {
                 const totalMinutos = Math.round(num * 24 * 60);
