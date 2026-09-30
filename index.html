@@ -94,7 +94,7 @@
         Senac MT — Sistema Integrado de Gestão de Frotas &copy; 2026
     </footer>
 
-    <!-- Script Robusto para Horários -->
+    <!-- Script Robusto atualizado para tratar horários -->
     <script>
         const FROTA_OFICIAL = ["ONIX-7B64", "ONIX-3G84", "L200"];
         let dadosGlobais = [];
@@ -139,17 +139,32 @@
             return dataIso;
         }
 
-        // Conversor seguro para horário decimal ou string do Excel
+        // Conversor blindado para formatos de hora do Excel / Power Automate
         function formatarHoraExcel(valorHora) {
             if (valorHora === null || valorHora === undefined || valorHora === "" || valorHora === 0 || valorHora === "0") return "-";
             
             let strHora = String(valorHora).trim();
 
+            // Se vier formato ISO ou data contendo 'T' (ex: 2026-09-29T18:00:00.000Z)
             if (strHora.includes('T')) {
-                strHora = strHora.split('T')[1].substring(0, 5);
-                return strHora === "00:00" ? "-" : strHora;
+                const partesT = strHora.split('T');
+                if (partesT[1]) {
+                    return partesT[1].substring(0, 5);
+                }
             }
 
+            // Se vier com formato completo de data no formato string ou similar
+            if (strHora.includes(' ')) {
+                const partesEspaco = strHora.split(' ');
+                // Procurar qual parte parece uma hora (contém dois pontos)
+                for (let p of partesEspaco) {
+                    if (p.includes(':')) {
+                        return p.substring(0, 5);
+                    }
+                }
+            }
+
+            // Se for número decimal do Excel (ex: fração de dias)
             const num = Number(strHora);
             if (!isNaN(num)) {
                 if (num === 0) return "-";
@@ -161,6 +176,7 @@
                 }
             }
 
+            // Se já vier no formato "HH:MM" ou "HH:MM:SS"
             if (strHora.length >= 5) {
                 return strHora.substring(0, 5);
             }
@@ -173,7 +189,7 @@
             const termoBusca = document.getElementById('busca-geral').value.toLowerCase();
 
             const agendamentosDoDia = dadosGlobais.filter(item => {
-                const dataItemBruto = item["Data"] || item["data"] || Object.values(item)[2] || "";
+                const dataItemBruto = item["Data"] || item["data"] || Object.values(item)[0] || "";
                 const dataItem = String(dataItemBruto).split('T')[0];
                 return dataItem === dataSelecionada;
             });
@@ -233,9 +249,9 @@
                 const tr = document.createElement('tr');
                 tr.className = "hover:bg-gray-50/80 transition-colors";
 
-                // Procurar por chaves de início comuns enviadas pelo Power Automate/Excel
-                const horaInicioBruta = item["Horário Início"] || item["Horario Inicio"] || item["Início"] || item["Inicio"] || Object.values(item)[3] || "";
-                const horaFimBruta = item["Horário Fim"] || item["Horario Fim"] || item["Fim"] || Object.values(item)[4] || "";
+                // Capturar colunas exatas do Excel
+                const horaInicioBruta = item["Horário Início"] || item["Horario Inicio"] || item["Início"] || item["Inicio"] || Object.values(item)[1] || "";
+                const horaFimBruta = item["Horário Fim"] || item["Horario Fim"] || item["Fim"] || Object.values(item)[2] || "";
 
                 const horaInicio = formatarHoraExcel(horaInicioBruta);
                 const horaFim = formatarHoraExcel(horaFimBruta);
