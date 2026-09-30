@@ -132,27 +132,84 @@
             return String(txt).trim().toUpperCase();
         }
 
+        // Leitura exata da data sem alteração de fuso horário UTC
+        function normalizarDataParaIso(dataBruta) {
+            if (dataBruta === null || dataBruta === undefined || dataBruta === "") return "";
+            let str = String(dataBruta).trim();
+
+            if (str.includes('T')) {
+                return str.substring(0, 10);
+            }
+
+            if (str.includes('/') || (str.includes('-') && str.indexOf('-') === 2)) {
+                const separador = str.includes('/') ? '/' : '-';
+                const partes = str.split(separador);
+                if (partes.length === 3) {
+                    let dia = partes[0].padStart(2, '0');
+                    let mes = partes[1].padStart(2, '0');
+                    let ano = partes[2];
+                    if (ano.length === 2) ano = '20' + ano;
+                    return `${ano}-${mes}-${dia}`;
+                }
+            }
+
+            return str.substring(0, 10);
+        }
+
         function formatarDataBR(dataIso) {
-            if (!dataIso) return "-";
-            const partes = dataIso.split('T')[0].split('-');
+            const isoLimpo = normalizarDataParaIso(dataIso);
+            const partes = isoLimpo.split('-');
             if (partes.length === 3) {
                 return `${partes[2]}/${partes[1]}/${partes[0]}`;
             }
             return dataIso;
         }
 
+        // Tratamento seguro para extrair o horário HH:MM perfeitamente do Excel
+        function formatarHora(valorHora) {
+            if (valorHora === null || valorHora === undefined || valorHora === "") return "-";
+            let strHora = String(valorHora).trim();
+            if (strHora === "0" || strHora === "0.0" || strHora === "--") return "00:00";
+
+            // Se vier em formato completo ISO com 'T'
+            if (strHora.includes('T')) {
+                const partesT = strHora.split('T');
+                if (partesT[1]) {
+                    return partesT[1].substring(0, 5);
+                }
+            }
+
+            // Se já estiver no formato HH:MM:SS ou HH:MM (ex: 09:00:00)
+            if (strHora.includes(':')) {
+                return strHora.substring(0, 5);
+            }
+
+            // Se vier como número decimal do Excel
+            const num = Number(strHora);
+            if (!isNaN(num) && num >= 0 && num < 1) {
+                const totalMinutos = Math.round(num * 24 * 60);
+                const horas = Math.floor(totalMinutos / 60);
+                const minutos = totalMinutos % 60;
+                return `${String(horas).padStart(2, '0')}:${String(minutos).padStart(2, '0')}`;
+            }
+
+            return strHora;
+        }
+
         function atualizarPainel() {
             const dataSelecionada = document.getElementById('filtro-data').value;
             const termoBusca = document.getElementById('busca-geral').value.toLowerCase();
 
+            // Filtrar agendamentos que caem na data selecionada
             const agendamentosDoDia = dadosGlobais.filter(item => {
-                const dataItem = item["Data"] ? item["Data"].split('T')[0] : "";
-                return dataItem === dataSelecionada;
+                const dataItemIso = normalizarDataParaIso(item["Data"] || item["Date"] || item["Dia"]);
+                return dataItemIso === dataSelecionada;
             });
 
+            // Identificar quais veículos da frota oficial estão ocupados nesta data
             const veiculosOcupados = new Set();
             agendamentosDoDia.forEach(item => {
-                const veiculoNome = normalizarTexto(item["Veículo"]);
+                const veiculoNome = normalizarTexto(item["Veículo"] || item["Veiculo"]);
                 FROTA_OFICIAL.forEach(f => {
                     if (normalizarTexto(f) === veiculoNome) {
                         veiculosOcupados.add(f);
@@ -160,6 +217,7 @@
                 });
             });
 
+            // Renderizar Cards dos 3 Veículos
             const gridVeiculos = document.getElementById('grid-veiculos');
             gridVeiculos.innerHTML = '';
 
@@ -184,11 +242,13 @@
                 gridVeiculos.appendChild(card);
             });
 
+            // Filtrar tabela com base na busca geral
             const agendamentosFiltrados = agendamentosDoDia.filter(item => {
                 const linhaStr = JSON.stringify(item).toLowerCase();
                 return linhaStr.includes(termoBusca);
             });
 
+            // Renderizar Tabela
             const tbody = document.getElementById('tabela-agendamentos');
             tbody.innerHTML = '';
             document.getElementById('contador-agendamentos').innerText = `${agendamentosFiltrados.length} agendamento(s) encontrado(s)`;
@@ -202,16 +262,15 @@
                 const tr = document.createElement('tr');
                 tr.className = "hover:bg-gray-50/80 transition-colors";
 
-                let horaInicio = item["Horário Início"] || item["Inicio"] || "-";
-                if (horaInicio.includes('T')) horaInicio = horaInicio.split('T')[1].substring(0, 5);
-                
-                let horaFim = item["Horário Fim"] || item["Fim"] || "-";
-                if (horaFim.includes('T')) horaFim = horaFim.split('T')[1].substring(0, 5);
+                const horaInicio = formatarHora(item["Horário Início"] || item["Horario Inicio"] || item["Início"] || item["Inicio"]);
+                const horaFim = formatarHora(item["Horário Fim"] || item["Horario Fim"] || item["Fim"]);
+                const veiculoNome = item["Veículo"] || item["Veiculo"] || "-";
+                const motoristaNome = item["Motorista/Solicitante"] || item["Motorista"] || item["Solicitante"] || "-";
 
                 tr.innerHTML = `
-                    <td class="py-4 px-6 text-gray-600">${formatarDataBR(item["Data"])}</td>
-                    <td class="py-4 px-6 font-semibold text-gray-900">${item["Veículo"] || "-"}</td>
-                    <td class="py-4 px-6 text-gray-700">${item["Motorista/Solicitante"] || item["Motorista"] || "-"}</td>
+                    <td class="py-4 px-6 text-gray-600">${formatarDataBR(item["Data"] || item["Date"])}</td>
+                    <td class="py-4 px-6 font-semibold text-gray-900">${veiculoNome}</td>
+                    <td class="py-4 px-6 text-gray-700">${motoristaNome}</td>
                     <td class="py-4 px-6 text-gray-600">${horaInicio}</td>
                     <td class="py-4 px-6 text-gray-600">${horaFim}</td>
                     <td class="py-4 px-6">
@@ -224,9 +283,11 @@
             });
         }
 
+        // Eventos de filtro
         document.getElementById('filtro-data').addEventListener('change', atualizarPainel);
         document.getElementById('busca-geral').addEventListener('input', atualizarPainel);
 
+        // Inicializar
         carregarDados();
         setInterval(carregarDados, 300000);
     </script>
