@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestão de Frota - Senac</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        senac: {
+                            blue: '#004587',
+                            darkBlue: '#002f5d',
+                            orange: '#f26a21',
+                            lightOrange: '#fff4ed',
+                            grayBg: '#f8fafc'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+</head>
+<body class="text-slate-800 antialiased min-h-screen flex flex-col">
+
+    <!-- Header Corporativo Senac -->
+    <header class="bg-senac-blue text-white shadow-md sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+            <div class="flex items-center space-x-4">
+                <div class="bg-white p-2 rounded-lg shadow-inner flex items-center justify-center">
+                    <!-- Símbolo / Logo Senac -->
+                    <span class="text-senac-blue font-extrabold text-2xl tracking-tighter italic">Senac</span>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold tracking-tight">Gestão de Frota</h1>
+                    <p class="text-xs text-blue-200">Painel de Agendamentos e Disponibilidade</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center space-x-3">
+                <button id="btn-refresh" onclick="loadData(true)" class="inline-flex items-center space-x-2 bg-senac-darkBlue hover:bg-slate-800 text-white text-sm font-medium py-2 px-4 rounded-lg transition-all duration-200 border border-blue-400/30 shadow-sm active:scale-95">
+                    <i id="refresh-icon" class="fa-solid fa-rotate"></i>
+                    <span class="hidden sm:inline">Atualizar Dados</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+        
+        <!-- Notificação de Status de Carga -->
+        <div id="status-banner" class="hidden p-4 rounded-xl border text-sm flex items-center justify-between transition-all">
+            <div class="flex items-center space-x-3">
+                <i id="status-icon" class="fa-solid fa-circle-info text-lg"></i>
+                <span id="status-message" class="font-medium">Carregando agendamentos...</span>
+            </div>
+            <span id="last-updated" class="text-xs opacity-75"></span>
+        </div>
+
+        <!-- Barra de Filtros Principais -->
+        <section class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200/80 space-y-4">
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+                
+                <!-- Selector de Data Principal -->
+                <div class="md:col-span-4 space-y-1.5">
+                    <label for="filter-date" class="block text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                        <i class="fa-regular fa-calendar text-senac-orange mr-1.5"></i> Data do Agendamento
+                    </label>
+                    <input type="date" id="filter-date" class="w-full bg-slate-50 border border-slate-300 text-slate-800 text-sm rounded-xl focus:ring-2 focus:ring-senac-blue focus:border-senac-blue block p-2.5 font-medium shadow-sm transition">
+                </div>
+
+                <!-- Botões Rápidos de Data -->
+                <div class="md:col-span-4 flex items-center space-x-2">
+                    <button onclick="setDateToday()" class="flex-1 bg-slate-100 hover:bg-senac-lightOrange hover:text-senac-orange text-slate-700 font-medium py-2.5 px-3 rounded-xl text-xs transition border border-slate-200 flex items-center justify-center space-x-1.5">
+                        <i class="fa-solid fa-calendar-day"></i>
+                        <span>Hoje</span>
+                    </button>
+                    <button onclick="setDateTomorrow()" class="flex-1 bg-slate-100 hover:bg-senac-lightOrange hover:text-senac-orange text-slate-700 font-medium py-2.5 px-3 rounded-xl text-xs transition border border-slate-200 flex items-center justify-center space-x-1.5">
+                        <i class="fa-solid fa-calendar-plus"></i>
+                        <span>Amanhã</span>
+                    </button>
+                    <button onclick="clearDateFilter()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium py-2.5 px-3 rounded-xl text-xs transition border border-slate-200 flex items-center justify-center space-x-1.5">
+                        <i class="fa-solid fa-list-ul"></i>
+                        <span>Todos</span>
+                    </button>
+                </div>
+
+                <!-- Pesquisa por texto / Filtro de veículo -->
+                <div class="md:col-span-4 space-y-1.5">
+                    <label for="filter-search" class="block text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                        <i class="fa-solid fa-magnifying-glass text-senac-orange mr-1.5"></i> Buscar
+                    </label>
+                    <div class="relative">
+                        <input type="text" id="filter-search" placeholder="Motorista, veículo ou detalhes..." class="w-full bg-slate-50 border border-slate-300 text-slate-800 text-sm rounded-xl focus:ring-2 focus:ring-senac-blue focus:border-senac-blue block pl-3 pr-10 p-2.5 shadow-sm transition">
+                        <i class="fa-solid fa-search absolute right-3 top-3 text-slate-400"></i>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- Resumo / Indicadores do Dia Selecionado -->
+        <section class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex items-center space-x-4">
+                <div class="w-12 h-12 bg-blue-50 text-senac-blue rounded-xl flex items-center justify-center text-xl font-bold">
+                    <i class="fa-solid fa-car-side"></i>
+                </div>
+                <div>
+                    <p class="text-xs text-slate-500 font-medium uppercase tracking-wider">Agendamentos no Dia</p>
+                    <h3 id="kpi-total-today" class="text-2xl font-extrabold text-slate-800">0</h3>
+                </div>
+            </div>
+
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex items-center space-x-4">
+                <div class="w-12 h-12 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center text-xl font-bold">
+                    <i class="fa-solid fa-key"></i>
+                </div>
+                <div>
+                    <p class="text-xs text-slate-500 font-medium uppercase tracking-wider">Veículos Em Uso</p>
+                    <h3 id="kpi-busy-vehicles" class="text-2xl font-extrabold text-slate-800">0</h3>
+                </div>
+            </div>
+
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex items-center space-x-4">
+                <div class="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center text-xl font-bold">
+                    <i class="fa-solid fa-circle-check"></i>
+                </div>
+                <div>
+                    <p class="text-xs text-slate-500 font-medium uppercase tracking-wider">Veículos Disponíveis</p>
+                    <h3 id="kpi-available-vehicles" class="text-2xl font-extrabold text-slate-800">0</h3>
+                </div>
+            </div>
+
+        </section>
+
+        <!-- Seção de Veículos Disponíveis na Data -->
+        <section class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 space-y-3">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div class="flex items-center space-x-2">
+                    <i class="fa-solid fa-shield-halved text-emerald-600 text-lg"></i>
+                    <h2 class="text-base font-bold text-slate-800">Status da Frota na Data Selecionada</h2>
+                </div>
+                <span id="selected-date-label" class="text-xs font-semibold text-slate-500 bg-slate-100 px-3 py-1 rounded-full">--</span>
+            </div>
+
+            <div id="available-vehicles-container" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 pt-2">
+                <!-- Veículos serão renderizados aqui dinamicamente -->
+            </div>
+        </section>
+
+        <!-- Lista de Agendamentos Detalhada -->
+        <section class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div class="p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div class="flex items-center space-x-2">
+                    <i class="fa-solid fa-list-check text-senac-blue text-lg"></i>
+                    <h2 class="text-base font-bold text-slate-800">Agendamentos Detalhados</h2>
+                </div>
+                <span id="count-badge" class="inline-flex items-center text-xs font-semibold bg-senac-lightOrange text-senac-orange px-3 py-1 rounded-full w-max">
+                    0 agendamentos encontrados
+                </span>
+            </div>
+
+            <!-- Tabela para Desktop -->
+            <div class="hidden md:block overflow-x-auto custom-scrollbar">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-slate-50 text-slate-500 text-xs font-semibold uppercase tracking-wider border-b border-slate-200">
+                            <th class="py-3.5 px-4">Data</th>
+                            <th class="py-3.5 px-4">Veículo</th>
+                            <th class="py-3.5 px-4">Motorista / Solicitante</th>
+                            <th class="py-3.5 px-4">Horário Início</th>
+                            <th class="py-3.5 px-4">Horário Fim</th>
+                            <th class="py-3.5 px-4">Status / Detalhes</th>
+                        </tr>
+                    </thead>
+                    <tbody id="table-body" class="divide-y divide-slate-100 text-sm">
+                        <!-- Linhas geradas via JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Vista em Cards para Mobile -->
+            <div id="cards-mobile-container" class="md:hidden p-4 space-y-3">
+                <!-- Cards mobile gerados via JavaScript -->
+            </div>
+
+            <!-- Estado Vazio / Sem Agendamentos -->
+            <div id="empty-state" class="hidden p-12 text-center space-y-3">
+                <div class="w-16 h-16 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center mx-auto text-2xl">
+                    <i class="fa-regular fa-calendar-xmark"></i>
+                </div>
+                <h3 class="text-base font-semibold text-slate-700">Nenhum agendamento encontrado</h3>
+                <p class="text-xs text-slate-500 max-w-sm mx-auto">Não há registros de saída para a data selecionada ou com os filtros aplicados.</p>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-slate-200 py-4 mt-auto">
+        <div class="max-w-7xl mx-auto px-4 text-center text-xs text-slate-500">
+            Senac &copy; 2026 - Painel de Controle de Agendamento de Veículos | Dados sincronizados via SharePoint & GitHub
+        </div>
+    </footer>
+
+    <script>
+        // Configuração de Endpoints
+        const DATA_URL = "https://raw.githubusercontent.com/changluis2016-jpg/Gest-o-de-frotas-Senac/principal/data.json";
+
+        // Lista padrão de Veículos conhecidos da Frota do Senac
+        const KNOWN_FLEET = ["L200", "Duster", "Spin", "Gol", "Onix", "Ranger", "Van Master", "Corolla"];
+
+        // Dados de Fallback (para demonstração imediata caso a URL demore para publicar)
+        const FALLBACK_DATA = {
+            "veiculos": [
+                {
+                    "Data": "2026-06-22T00:00:00.000Z",
+                    "Horário Início": "1908-07-21T08:00:00.000Z",
+                    "Horário Fim": "12:00",
+                    "Veículo": "L200",
+                    "Motorista/Solicitante": "Carlos Silva - Unidade Centro"
+                },
+                {
+                    "Data": "2026-09-30T00:00:00.000Z",
+                    "Horário Início": "08:30",
+                    "Horário Fim": "17:30",
+                    "Veículo": "Duster",
+                    "Motorista/Solicitante": "Ana Maria - Faculdade Senac"
+                },
+                {
+                    "Data": "2026-09-30T00:00:00.000Z",
+                    "Horário Início": "13:00",
+                    "Horário Fim": "18:00",
+                    "Veículo": "L200",
+                    "Motorista/Solicitante": "Roberto Souza - TI Senac"
+                }
+            ]
+        };
+
+        // Estado Global
+        let allBookings = [];
+        let activeFleetList = [...KNOWN_FLEET];
+
+        // Inicialização ao carregar o DOM
+        document.addEventListener("DOMContentLoaded", () => {
+            // Define data padrão como Hoje
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('filter-date').value = today;
+
+            // Event Listeners
+            document.getElementById('filter-date').addEventListener('change', render);
+            document.getElementById('filter-search').addEventListener('input', render);
+
+            // Carregar Dados
+            loadData();
+        });
+
+        // Función para carregar dados do GitHub
+        async function loadData(manualRefresh = false) {
+            const statusBanner = document.getElementById('status-banner');
+            const statusMessage = document.getElementById('status-message');
+            const statusIcon = document.getElementById('status-icon');
+            const refreshIcon = document.getElementById('refresh-icon');
+
+            if (manualRefresh) refreshIcon.classList.add('fa-spin');
+
+            statusBanner.classList.remove('hidden', 'bg-emerald-50', 'text-emerald-800', 'border-emerald-200', 'bg-amber-50', 'text-amber-800', 'border-amber-200');
+            statusBanner.classList.add('bg-blue-50', 'text-blue-800', 'border-blue-200');
+            statusIcon.className = "fa-solid fa-spinner fa-spin text-lg";
+            statusMessage.textContent = "Buscando informações mais recentes do GitHub...";
+
+            try {
+                // Adiciona timestamp para evitar cache do browser
+                const response = await fetch(`${DATA_URL}?t=${Date.now()}`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP Error: ${response.status}`);
+                }
+
+                const json = await response.json();
+                
+                // Trata a estrutura dos dados retornados
+                if (json && Array.isArray(json.veiculos)) {
+                    allBookings = normalizeData(json.veiculos);
+                } else if (Array.isArray(json)) {
+                    allBookings = normalizeData(json);
+                } else {
+                    throw new Error("Formato JSON não esperado.");
+                }
+
+                showStatus("Dados carregados com sucesso diretamente do GitHub!", "success");
+
+            } catch (error) {
+                console.warn("Falha ao carregar do GitHub, carregando dados de backup:", error);
+                allBookings = normalizeData(FALLBACK_DATA.veiculos);
+                showStatus("Usando dados sincronizados offline. (Servidor raw do GitHub atualizando)", "warning");
+            } finally {
+                if (manualRefresh) refreshIcon.classList.remove('fa-spin');
+                extractFleetFromData();
+                render();
+            }
+        }
+
+        // Padronização e limpeza dos dados vindos do Power Automate
+        function normalizeData(rawData) {
+            return rawData.map(item => {
+                // Formatação de Data YYYY-MM-DD
+                let formattedDate = "";
+                if (item.Data) {
+                    const dateObj = new Date(item.Data);
+                    if (!isNaN(dateObj.getTime())) {
+                        formattedDate = dateObj.toISOString().split('T')[0];
+                    } else if (typeof item.Data === 'string') {
+                        formattedDate = item.Data.split('T')[0];
+                    }
+                }
+
+                // Formatação do Horário Início
+                let startTime = item["Horário Início"] || item["Horario Inicio"] || "--:--";
+                if (startTime.includes('T')) {
+                    const timeObj = new Date(startTime);
+                    if (!isNaN(timeObj.getTime())) {
+                        startTime = timeObj.toTimeString().substring(0, 5);
+                    } else {
+                        startTime = "08:00"; // Padrão se for ISO com ano antigo
+                    }
+                }
+
+                // Formatação do Horário Fim
+                let endTime = item["Horário Fim"] || item["Horario Fim"] || "--:--";
+
+                return {
+                    rawDate: item.Data,
+                    date: formattedDate,
+                    vehicle: (item["Veículo"] || item["Veiculo"] || "Não Especificado").trim(),
+                    driver: (item["Motorista/Solicitante"] || item["Motorista"] || "Não Identificado").trim(),
+                    startTime: startTime,
+                    endTime: endTime
+                };
+            });
+        }
+
+        // Identifica todos os veículos únicos presentes no histórico e combina com a frota padrão
+        function extractFleetFromData() {
+            const datasetVehicles = allBookings.map(b => b.vehicle).filter(v => v && v !== "Não Especificado");
+            const combined = new Set([...KNOWN_FLEET, ...datasetVehicles]);
+            activeFleetList = Array.from(combined);
+        }
+
+        function render() {
+            const dateFilter = document.getElementById('filter-date').value;
+            const searchFilter = document.getElementById('filter-search').value.toLowerCase().trim();
+
+            // 1. Filtrar Agendamentos
+            let filtered = allBookings.filter(item => {
+                const matchesDate = !dateFilter || item.date === dateFilter;
+                const matchesSearch = !searchFilter || 
+                    item.vehicle.toLowerCase().includes(searchFilter) ||
+                    item.driver.toLowerCase().includes(searchFilter);
+                return matchesDate && matchesSearch;
+            });
+
+            // Ordenar por horário de início
+            filtered.sort((a, b) => a.startTime.localeCompare(b.startTime));
+
+            // 2. Veículos Ocupados e Disponíveis na Data Selecionada
+            const busyVehiclesInSelectedDate = new Set();
+            if (dateFilter) {
+                allBookings.forEach(b => {
+                    if (b.date === dateFilter) {
+                        busyVehiclesInSelectedDate.add(b.vehicle);
+                    }
+                });
+            }
+
+            const availableVehicles = activeFleetList.filter(v => !busyVehiclesInSelectedDate.has(v));
+
+            // 3. Atualizar KPIs
+            document.getElementById('kpi-total-today').textContent = filtered.length;
+            document.getElementById('kpi-busy-vehicles').textContent = busyVehiclesInSelectedDate.size;
+            document.getElementById('kpi-available-vehicles').textContent = availableVehicles.length;
+
+            // Atualizar Rótulo da Data Selecionada
+            const labelDate = dateFilter ? formatDateBR(dateFilter) : "Todas as datas";
+            document.getElementById('selected-date-label').textContent = labelDate;
+
+            // 4. Renderizar Cartões de Veículos Disponíveis
+            renderAvailableVehicles(availableVehicles, busyVehiclesInSelectedDate);
+
+            // 5. Renderizar Tabela / Cards de Agendamentos
+            renderBookingsList(filtered);
+        }
+
+        // Exibe os quadros de disponibilidade dos veículos
+        function renderAvailableVehicles(availableList, busySet) {
+            const container = document.getElementById('available-vehicles-container');
+            container.innerHTML = "";
+
+            activeFleetList.forEach(vehicle => {
+                const isBusy = busySet.has(vehicle);
+                const card = document.createElement('div');
+                card.className = `p-3 rounded-xl border flex flex-col items-center justify-center text-center transition-all ${
+                    isBusy 
+                    ? 'bg-amber-50/60 border-amber-200 text-amber-900' 
+                    : 'bg-emerald-50/60 border-emerald-200 text-emerald-900'
+                }`;
+
+                card.innerHTML = `
+                    <div class="text-lg mb-1 ${isBusy ? 'text-amber-600' : 'text-emerald-600'}">
+                        <i class="fa-solid ${isBusy ? 'fa-car-side opacity-60' : 'fa-car'}"></i>
+                    </div>
+                    <span class="font-bold text-xs">${vehicle}</span>
+                    <span class="text-[10px] font-medium mt-1 px-2 py-0.5 rounded-full ${
+                        isBusy 
+                        ? 'bg-amber-200/60 text-amber-800' 
+                        : 'bg-emerald-200/60 text-emerald-800'
+                    }">
+                        ${isBusy ? 'Ocupado' : 'Disponível'}
+                    </span>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        // Renderiza a lista principal de agendamentos
+        function renderBookingsList(items) {
+            const tableBody = document.getElementById('table-body');
+            const mobileContainer = document.getElementById('cards-mobile-container');
+            const emptyState = document.getElementById('empty-state');
+            const countBadge = document.getElementById('count-badge');
+
+            tableBody.innerHTML = "";
+            mobileContainer.innerHTML = "";
+
+            countBadge.textContent = `${items.length} agendamento(s) encontrado(s)`;
+
+            if (items.length === 0) {
+                emptyState.classList.remove('hidden');
+                return;
+            } else {
+                emptyState.classList.add('hidden');
+            }
+
+            items.forEach(item => {
+                // Renderizar Linha de Tabela (Desktop)
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50/80 transition-colors";
+                tr.innerHTML = `
+                    <td class="py-3.5 px-4 font-medium text-slate-700 whitespace-nowrap">
+                        <i class="fa-regular fa-calendar text-slate-400 mr-2"></i>${formatDateBR(item.date)}
+                    </td>
+                    <td class="py-3.5 px-4 font-bold text-senac-blue whitespace-nowrap">
+                        <span class="bg-blue-50 text-senac-blue px-2.5 py-1 rounded-lg border border-blue-100">
+                            <i class="fa-solid fa-car-side mr-1.5 text-xs"></i>${item.vehicle}
+                        </span>
+                    </td>
+                    <td class="py-3.5 px-4 text-slate-800 font-medium">
+                        ${item.driver}
+                    </td>
+                    <td class="py-3.5 px-4 text-slate-600 font-medium whitespace-nowrap">
+                        <i class="fa-regular fa-clock text-emerald-600 mr-1.5"></i>${item.startTime}
+                    </td>
+                    <td class="py-3.5 px-4 text-slate-600 font-medium whitespace-nowrap">
+                        <i class="fa-regular fa-clock text-amber-600 mr-1.5"></i>${item.endTime}
+                    </td>
+                    <td class="py-3.5 px-4 whitespace-nowrap">
+                        <span class="inline-flex items-center text-xs font-medium px-2.5 py-1 rounded-full bg-slate-100 text-slate-700">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5"></span>Confirmado
+                        </span>
+                    </td>
+                `;
+                tableBody.appendChild(tr);
+
+                // Renderizar Card (Mobile)
+                const card = document.createElement('div');
+                card.className = "bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2.5";
+                card.innerHTML = `
+                    <div class="flex items-center justify-between">
+                        <span class="bg-blue-100 text-senac-blue text-xs font-bold px-2.5 py-1 rounded-lg">
+                            ${item.vehicle}
+                        </span>
+                        <span class="text-xs text-slate-500 font-medium">
+                            ${formatDateBR(item.date)}
+                        </span>
+                    </div>
+                    <div class="text-sm font-semibold text-slate-800">
+                        <i class="fa-solid fa-user-tie text-slate-400 mr-1.5"></i>${item.driver}
+                    </div>
+                    <div class="flex items-center space-x-4 text-xs text-slate-600 border-t border-slate-200/60 pt-2">
+                        <div>
+                            <span class="text-slate-400">Início:</span> <strong>${item.startTime}</strong>
+                        </div>
+                        <div>
+                            <span class="text-slate-400">Fim:</span> <strong>${item.endTime}</strong>
+                        </div>
+                    </div>
+                `;
+                mobileContainer.appendChild(card);
+            });
+        }
+
+        // Funções Auxiliares de Filtro de Data
+        function setDateToday() {
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('filter-date').value = today;
+            render();
+        }
+
+        function setDateTomorrow() {
+            const tomorrow = new Date();
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            document.getElementById('filter-date').value = tomorrow.toISOString().split('T')[0];
+            render();
+        }
+
+        function clearDateFilter() {
+            document.getElementById('filter-date').value = "";
+            render();
+        }
+
+        function formatDateBR(dateStr) {
+            if (!dateStr) return "--/--/----";
+            const parts = dateStr.split('-');
+            if (parts.length === 3) {
+                return `${parts[2]}/${parts[1]}/${parts[0]}`;
+            }
+            return dateStr;
+        }
+
+        function showStatus(message, type) {
+            const banner = document.getElementById('status-banner');
+            const statusMessage = document.getElementById('status-message');
+            const statusIcon = document.getElementById('status-icon');
+            const lastUpdated = document.getElementById('last-updated');
+
+            banner.classList.remove('hidden', 'bg-blue-50', 'text-blue-800', 'border-blue-200', 'bg-emerald-50', 'text-emerald-800', 'border-emerald-200', 'bg-amber-50', 'text-amber-800', 'border-amber-200');
+
+            if (type === 'success') {
+                banner.classList.add('bg-emerald-50', 'text-emerald-800', 'border-emerald-200');
+                statusIcon.className = "fa-solid fa-circle-check text-lg text-emerald-600";
+            } else if (type === 'warning') {
+                banner.classList.add('bg-amber-50', 'text-amber-800', 'border-amber-200');
+                statusIcon.className = "fa-solid fa-triangle-exclamation text-lg text-amber-600";
+            }
+
+            statusMessage.textContent = message;
+            lastUpdated.textContent = `Atualizado às ${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+        }
+    </script>
+</body>
+</html>
