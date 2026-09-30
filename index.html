@@ -160,17 +160,25 @@
             return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : iso;
         }
 
-        // Pega direto da Coluna1 e Coluna2 (ou faz fallback se não achar)
-        function formatarHora(valorColunaTexto, valorDireto) {
-            if (valorColunaTexto !== null && valorColunaTexto !== undefined && String(valorColunaTexto).trim() !== "") {
-                let vTxt = String(valorColunaTexto).trim();
-                if (vTxt.length >= 5) return vTxt.substring(0, 5);
-                return vTxt;
+        // Função inteligente: Testa Coluna auxiliar (Coluna1/Coluna2), se falhar usa a coluna principal
+        function formatarHoraHibrida(valorAuxiliar, valorPrincipal) {
+            // 1. Tenta usar o valor auxiliar (Coluna1 ou Coluna2) se válido
+            if (valorAuxiliar !== null && valorAuxiliar !== undefined) {
+                let vAux = String(valorAuxiliar).trim();
+                if (vAux !== "" && vAux !== "--" && vAux !== "0" && vAux !== "NaN") {
+                    return vAux.length >= 5 ? vAux.substring(0, 5) : vAux;
+                }
             }
 
-            if (valorDireto === null || valorDireto === undefined || valorDireto === "") return "-";
-            let vStr = String(valorDireto).trim();
+            // 2. Se a auxiliar estiver vazia, usa o valor principal
+            if (valorPrincipal === null || valorPrincipal === undefined || valorPrincipal === "") return "--";
+            let vStr = String(valorPrincipal).trim();
             if (vStr === "0" || vStr === "0.0" || vStr === "--" || vStr === "NaN") return "--";
+
+            if (vStr.includes('T')) {
+                const ped = vStr.split('T');
+                if (ped[1]) return ped[1].substring(0, 5);
+            }
 
             const matchHora = vStr.match(/^(\d{1,2}):(\d{2})/);
             if (matchHora) {
@@ -240,9 +248,9 @@
                 const tr = document.createElement('tr');
                 tr.className = "hover:bg-gray-50/80 transition-colors";
 
-                // Lê diretamente da Coluna1 e Coluna2 da sua planilha
-                const horaInicio = formatarHora(item["Coluna1"], item["Horário Início"] || item["Horario Inicio"]);
-                const horaFim = formatarHora(item["Coluna2"], item["Horário Fim"] || item["Horario Fim"]);
+                // Usa o método híbrido para garantir que o dia 30 e os demais apareçam perfeitamente
+                const horaInicio = formatarHoraHibrida(item["Coluna1"], item["Horário Início"] || item["Horario Inicio"]);
+                const horaFim = formatarHoraHibrida(item["Coluna2"], item["Horário Fim"] || item["Horario Fim"]);
 
                 const veiculoNome = item["Veículo"] || item["Veiculo"] || "-";
                 const motoristaNome = item["Motorista/Solicitante"] || item["Motorista"] || item["Solicitante"] || "-";
