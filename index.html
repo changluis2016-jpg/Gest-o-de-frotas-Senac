@@ -132,76 +132,27 @@
             return String(txt).trim().toUpperCase();
         }
 
-        function normalizarDataParaIso(dataBruta) {
-            if (!dataBruta) return "";
-            let str = String(dataBruta).trim();
-
-            if (str.includes('T')) {
-                return str.substring(0, 10);
-            }
-
-            if (str.includes('/') || (str.includes('-') && str.indexOf('-') === 2)) {
-                const sep = str.includes('/') ? '/' : '-';
-                const p = str.split(sep);
-                if (p.length === 3) {
-                    let d = p[0].padStart(2, '0');
-                    let m = p[1].padStart(2, '0');
-                    let a = p[2];
-                    if (a.length === 2) a = '20' + a;
-                    return `${a}-${m}-${d}`;
-                }
-            }
-
-            return str.substring(0, 10);
-        }
-
         function formatarDataBR(dataIso) {
-            const iso = normalizarDataParaIso(dataIso);
-            const p = iso.split('-');
-            return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : dataIso;
-        }
-
-        // Função de formatação tratada com nova ordem e nomenclatura única
-        function formatarHora(valor) {
-            if (valor === null || valor === undefined || valor === "") return "-";
-            let vStr = String(valor).trim();
-            if (vStr === "0" || vStr === "0.0" || vStr === "--") return "00:00";
-
-            if (vStr.includes('T')) {
-                const ped = vStr.split('T');
-                if (ped[1]) return ped[1].substring(0, 5);
+            if (!dataIso) return "-";
+            const partes = dataIso.split('T')[0].split('-');
+            if (partes.length === 3) {
+                return `${partes[2]}/${partes[1]}/${partes[0]}`;
             }
-
-            const regExHora = vStr.match(/^(\d{2}):(\d{2})/);
-            if (regExHora) {
-                return `${regExHora[1]}:${regExHora[2]}`;
-            }
-
-            const nDecimal = Number(vStr);
-            if (!isNaN(nDecimal) && nDecimal >= 0 && nDecimal < 1) {
-                const mTotal = Math.round(nDecimal * 24 * 60);
-                const h = Math.floor(mTotal / 60);
-                const m = mTotal % 60;
-                return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-            }
-
-            return vStr;
+            return dataIso;
         }
 
         function atualizarPainel() {
             const dataSelecionada = document.getElementById('filtro-data').value;
             const termoBusca = document.getElementById('busca-geral').value.toLowerCase();
 
-            // Filtrar agendamentos que caem na data selecionada
             const agendamentosDoDia = dadosGlobais.filter(item => {
-                const dataItemIso = normalizarDataParaIso(item["Data"] || item["Date"] || item["Dia"]);
-                return dataItemIso === dataSelecionada;
+                const dataItem = item["Data"] ? item["Data"].split('T')[0] : "";
+                return dataItem === dataSelecionada;
             });
 
-            // Identificar quais veículos da frota oficial estão ocupados nesta data
             const veiculosOcupados = new Set();
             agendamentosDoDia.forEach(item => {
-                const veiculoNome = normalizarTexto(item["Veículo"] || item["Veiculo"]);
+                const veiculoNome = normalizarTexto(item["Veículo"]);
                 FROTA_OFICIAL.forEach(f => {
                     if (normalizarTexto(f) === veiculoNome) {
                         veiculosOcupados.add(f);
@@ -209,7 +160,6 @@
                 });
             });
 
-            // Renderizar Cards dos 3 Veículos
             const gridVeiculos = document.getElementById('grid-veiculos');
             gridVeiculos.innerHTML = '';
 
@@ -234,13 +184,11 @@
                 gridVeiculos.appendChild(card);
             });
 
-            // Filtrar tabela com base na busca geral
             const agendamentosFiltrados = agendamentosDoDia.filter(item => {
                 const linhaStr = JSON.stringify(item).toLowerCase();
                 return linhaStr.includes(termoBusca);
             });
 
-            // Renderizar Tabela
             const tbody = document.getElementById('tabela-agendamentos');
             tbody.innerHTML = '';
             document.getElementById('contador-agendamentos').innerText = `${agendamentosFiltrados.length} agendamento(s) encontrado(s)`;
@@ -254,15 +202,16 @@
                 const tr = document.createElement('tr');
                 tr.className = "hover:bg-gray-50/80 transition-colors";
 
-                const horaInicio = formatarHora(item["Horário Início"] || item["Horario Inicio"] || item["Início"] || item["Inicio"]);
-                const horaFim = formatarHora(item["Horário Fim"] || item["Horario Fim"] || item["Fim"]);
-                const veiculoNome = item["Veículo"] || item["Veiculo"] || "-";
-                const motoristaNome = item["Motorista/Solicitante"] || item["Motorista"] || item["Solicitante"] || "-";
+                let horaInicio = item["Horário Início"] || item["Inicio"] || "-";
+                if (horaInicio.includes('T')) horaInicio = horaInicio.split('T')[1].substring(0, 5);
+                
+                let horaFim = item["Horário Fim"] || item["Fim"] || "-";
+                if (horaFim.includes('T')) horaFim = horaFim.split('T')[1].substring(0, 5);
 
                 tr.innerHTML = `
-                    <td class="py-4 px-6 text-gray-600">${formatarDataBR(item["Data"] || item["Date"])}</td>
-                    <td class="py-4 px-6 font-semibold text-gray-900">${veiculoNome}</td>
-                    <td class="py-4 px-6 text-gray-700">${motoristaNome}</td>
+                    <td class="py-4 px-6 text-gray-600">${formatarDataBR(item["Data"])}</td>
+                    <td class="py-4 px-6 font-semibold text-gray-900">${item["Veículo"] || "-"}</td>
+                    <td class="py-4 px-6 text-gray-700">${item["Motorista/Solicitante"] || item["Motorista"] || "-"}</td>
                     <td class="py-4 px-6 text-gray-600">${horaInicio}</td>
                     <td class="py-4 px-6 text-gray-600">${horaFim}</td>
                     <td class="py-4 px-6">
@@ -275,11 +224,9 @@
             });
         }
 
-        // Eventos de filtro
         document.getElementById('filtro-data').addEventListener('change', atualizarPainel);
         document.getElementById('busca-geral').addEventListener('input', atualizarPainel);
 
-        // Inicializar
         carregarDados();
         setInterval(carregarDados, 300000);
     </script>
