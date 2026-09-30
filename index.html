@@ -132,7 +132,7 @@
             return String(txt).trim().toUpperCase();
         }
 
-        // CORREÇÃO CRUCIAL DA DATA: Extrai estritamente os primeiros 10 carateres (YYYY-MM-DD) sem conversão de fuso horário
+        // Leitura exata da data sem alteração de fuso horário UTC
         function normalizarDataParaIso(dataBruta) {
             if (dataBruta === null || dataBruta === undefined || dataBruta === "") return "";
             let str = String(dataBruta).trim();
@@ -165,49 +165,42 @@
             return dataIso;
         }
 
-        // Formatação inteligente para horas decimais do Excel (ex: 0.5 -> 12:00, 0.72916... -> 17:30)
+        // Tratamento seguro para extrair o horário HH:MM perfeitamente do Excel
         function formatarHora(valorHora) {
-    if (valorHora === null || valorHora === undefined || valorHora === "") return "-";
-    let strHora = String(valorHora).trim();
-    if (strHora === "0" || strHora === "0.0" || strHora === "--") return "00:00";
+            if (valorHora === null || valorHora === undefined || valorHora === "") return "-";
+            let strHora = String(valorHora).trim();
+            if (strHora === "0" || strHora === "0.0" || strHora === "--") return "00:00";
 
-    // Se vier no formato ISO completo (ex: 2026-09-28T15:00:00.000Z ou similar)
-    if (strHora.includes('T')) {
-        const partesT = strHora.split('T');
-        if (partesT[1]) {
-            return partesT[1].substring(0, 5); // Pega apenas HH:MM
+            // Se vier em formato completo ISO com 'T'
+            if (strHora.includes('T')) {
+                const partesT = strHora.split('T');
+                if (partesT[1]) {
+                    return partesT[1].substring(0, 5);
+                }
+            }
+
+            // Se já estiver no formato HH:MM:SS ou HH:MM (ex: 09:00:00)
+            if (strHora.includes(':')) {
+                return strHora.substring(0, 5);
+            }
+
+            // Se vier como número decimal do Excel
+            const num = Number(strHora);
+            if (!isNaN(num) && num >= 0 && num < 1) {
+                const totalMinutos = Math.round(num * 24 * 60);
+                const horas = Math.floor(totalMinutos / 60);
+                const minutos = totalMinutos % 60;
+                return `${String(horas).padStart(2, '0')}:${String(minutos).padStart(2, '0')}`;
+            }
+
+            return strHora;
         }
-    }
 
-    // Se vier com o ano corrompido do Excel (ex: começa com 1899, 1900, 1901, etc.)
-    if (strHora.startsWith('1899') || strHora.startsWith('1900') || strHora.startsWith('1901') || strHora.startsWith('1908')) {
-        if (strHora.includes('T')) {
-            const horaPart = strHora.split('T')[1];
-            if (horaPart) return horaPart.substring(0, 5);
-        }
-    }
-
-    // Se for número decimal do Excel (ex: 0.5)
-    const num = Number(strHora);
-    if (!isNaN(num) && num >= 0 && num < 1) {
-        const totalMinutos = Math.round(num * 24 * 60);
-        const horas = Math.floor(totalMinutos / 60);
-        const minutos = totalMinutos % 60;
-        return `${String(horas).padStart(2, '0')}:${String(minutos).padStart(2, '0')}`;
-    }
-
-    // Se já estiver limpo no formato HH:MM ou HH:MM:SS
-    if (strHora.length >= 5 && strHora.includes(':')) {
-        return strHora.substring(0, 5);
-    }
-
-    return strHora;
-}
         function atualizarPainel() {
             const dataSelecionada = document.getElementById('filtro-data').value;
             const termoBusca = document.getElementById('busca-geral').value.toLowerCase();
 
-            // Filtrar agendamentos que caem na data selecionada de forma exata
+            // Filtrar agendamentos que caem na data selecionada
             const agendamentosDoDia = dadosGlobais.filter(item => {
                 const dataItemIso = normalizarDataParaIso(item["Data"] || item["Date"] || item["Dia"]);
                 return dataItemIso === dataSelecionada;
