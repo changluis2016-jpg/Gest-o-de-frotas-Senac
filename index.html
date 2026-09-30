@@ -25,7 +25,7 @@
             <div class="mt-3 sm:mt-0 flex items-center space-x-4">
                 <div id="status-sinc" class="text-xs bg-blue-800 px-3 py-1.5 rounded-full flex items-center space-x-1.5 border border-blue-700">
                     <span class="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span>
-                    <span id="txt-atualizacao">Sincronizado com GitHub</span>
+                    <span id="txt-atualizacao">Sincronizado com SharePoint</span>
                 </div>
             </div>
         </div>
@@ -48,16 +48,11 @@
             </div>
         </div>
 
-        <!-- Painel de Diagnóstico Visual -->
-        <div id="painel-diagnostico" class="bg-blue-50 border border-blue-200 text-blue-900 px-4 py-3 rounded-xl mb-6 text-xs font-mono hidden">
-            <strong>Diagnóstico:</strong> <span id="txt-diag">A carregar dados...</span>
-        </div>
-
         <!-- Fleet Status Section -->
         <div class="bg-white rounded-xl shadow-sm p-6 mb-8 border border-gray-100">
             <h2 class="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
                 <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0"></path></svg>
-                Status da Frota Oficial (3 Veículos)
+                Status da Frota (3 Veículos Oficiais)
             </h2>
             <div id="grid-veiculos" class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <!-- Preenchido via JavaScript -->
@@ -99,171 +94,76 @@
         Senac MT — Sistema Integrado de Gestão de Frotas &copy; 2026
     </footer>
 
-    <!-- Script Corrigido contra Fuso Horário UTC -->
+    <!-- Script de Processamento -->
     <script>
+        // Os 3 veículos oficiais exatos da unidade
         const FROTA_OFICIAL = ["ONIX-7B64", "ONIX-3G84", "L200"];
         let dadosGlobais = [];
 
-        window.addEventListener('DOMContentLoaded', () => {
-            const inputData = document.getElementById('filtro-data');
-            if (inputData && !inputData.value) {
-                const hoje = new Date().toISOString().split('T')[0];
-                inputData.value = hoje;
-            }
-            carregarDados();
-        });
+        // Definir a data de hoje como padrão no formato YYYY-MM-DD
+        const hojeStr = new Date().toISOString().split('T')[0];
+        document.getElementById('filtro-data').value = hojeStr;
 
+        // Carregar dados do data.json
         async function carregarDados() {
             try {
-                const resposta = await fetch('data.json?t=' + new Date().getTime());
-                if (!resposta.ok) throw new Error('Ficheiro data.json não encontrado.');
-                
+                const resposta = await fetch('data.json?' + new Date().getTime());
+                if (!resposta.ok) throw new Error('Erro ao carregar dados');
                 const json = await resposta.json();
                 
+                // Extrair array de veículos dependendo da estrutura do JSON
                 if (Array.isArray(json)) {
                     dadosGlobais = json;
                 } else if (json.veiculos && Array.isArray(json.veiculos)) {
                     dadosGlobais = json.veiculos;
                 } else {
-                    const chaveArray = Object.keys(json).find(k => Array.isArray(json[k]));
-                    dadosGlobais = chaveArray ? json[chaveArray] : [];
+                    dadosGlobais = [];
                 }
                 
-                mostrarMensagemDiagnostico(`Total de registos carregados: ${dadosGlobais.length}. Data pura detetada: ${JSON.stringify(extrairCampo(dadosGlobais[0], ["Data", "Date", "Dia"], 0))}`);
                 atualizarPainel();
             } catch (erro) {
                 console.error("Erro:", erro);
-                mostrarMensagemDiagnostico("Erro ao carregar data.json: " + erro.message);
-                document.getElementById('txt-atualizacao').innerText = "Erro ao sincronizar";
+                document.getElementById('txt-atualizacaoinnerText').innerText = "Erro ao sincronizar dados";
             }
         }
 
-        function mostrarMensagemDiagnostico(msg) {
-            const painel = document.getElementById('painel-diagnostico');
-            const texto = document.getElementById('txt-diag');
-            if (painel && texto) {
-                painel.classList.remove('hidden');
-                texto.innerText = msg;
-            }
-        }
-
-        function limparStr(str) {
-            if (!str) return "";
-            return String(str).trim().toUpperCase().replace(/\s+/g, '');
-        }
-
-        // CORREÇÃO CRUCIAL: Extrai estritamente os primeiros 10 carateres (YYYY-MM-DD) sem conversão de fuso horário local
-        function normalizarDataParaIso(dataBruta) {
-            if (dataBruta === null || dataBruta === undefined || dataBruta === "") return "";
-            let str = String(dataBruta).trim();
-
-            // Se vier no formato ISO com 'T' (ex: 2026-06-22T00:00:00.000Z), cortamos diretamente a parte da data
-            if (str.includes('T')) {
-                return str.substring(0, 10);
-            }
-
-            // Formato número serial do Excel
-            const num = Number(str);
-            if (!isNaN(num) && num > 30000 && num < 60000) {
-                const dataExcel = new Date(Math.round((num - (25567 + 2)) * 86400 * 1000));
-                if (!isNaN(dataExcel.getTime())) {
-                    const ano = dataExcel.getUTCFullYear();
-                    const mes = String(dataExcel.getUTCMonth() + 1).padStart(2, '0');
-                    const dia = String(dataExcel.getUTCDate()).padStart(2, '0');
-                    return `${ano}-${mes}-${dia}`;
-                }
-            }
-
-            // Formato brasileiro DD/MM/YYYY ou DD-MM-YYYY
-            if (str.includes('/') || (str.includes('-') && str.indexOf('-') === 2)) {
-                const separador = str.includes('/') ? '/' : '-';
-                const partes = str.split(separador);
-                if (partes.length === 3) {
-                    let dia = partes[0].padStart(2, '0');
-                    let mes = partes[1].padStart(2, '0');
-                    let ano = partes[2];
-                    if (ano.length === 2) ano = '20' + ano;
-                    return `${ano}-${mes}-${dia}`;
-                }
-            }
-
-            return str.substring(0, 10);
+        function normalizarTexto(txt) {
+            if (!txt) return "";
+            return String(txt).trim().toUpperCase();
         }
 
         function formatarDataBR(dataIso) {
-            const isoLimpo = normalizarDataParaIso(dataIso);
-            const partes = isoLimpo.split('-');
+            if (!dataIso) return "-";
+            // Se vier em formato ISO YYYY-MM-DDTHH:mm:ss...
+            const partes = dataIso.split('T')[0].split('-');
             if (partes.length === 3) {
                 return `${partes[2]}/${partes[1]}/${partes[0]}`;
             }
             return dataIso;
         }
 
-        function formatarHoraExcel(valorHora) {
-            if (valorHora === null || valorHora === undefined || valorHora === "") return "-";
-            let strHora = String(valorHora).trim();
-            if (strHora === "0" || strHora === "0.0" || strHora === "--" || strHora.includes("1908-")) return "-";
-
-            if (strHora.includes('T')) {
-                const partesT = strHora.split('T');
-                if (partesT[1] && partesT[1].substring(0, 5) !== "00:00") return partesT[1].substring(0, 5);
-            }
-
-            if (strHora.includes(' ')) {
-                const partesEspaco = strHora.split(' ');
-                for (let p of partesEspaco) {
-                    if (p.includes(':') && p !== "00:00:00") return p.substring(0, 5);
-                }
-            }
-
-            const num = Number(strHora);
-            if (!isNaN(num) && num > 0 && num < 1) {
-                const totalMinutos = Math.round(num * 24 * 60);
-                const horas = Math.floor(totalMinutos / 60);
-                const minutos = totalMinutos % 60;
-                return `${String(horas).padStart(2, '0')}:${String(minutos).padStart(2, '0')}`;
-            }
-
-            if (strHora.length >= 5 && strHora !== "00:00") return strHora.substring(0, 5);
-            return "-";
-        }
-
-        function extrairCampo(item, chavesPossiveis, indiceFallback) {
-            const chavesItem = Object.keys(item);
-            for (let cp of chavesPossiveis) {
-                const encontrada = chavesItem.find(k => limparStr(k) === limparStr(cp) || limparStr(k).includes(limparStr(cp)));
-                if (encontrada && item[encontrada] !== undefined && item[encontrada] !== "") {
-                    return item[encontrada];
-                }
-            }
-            const valores = Object.values(item);
-            return valores[indiceFallback] !== undefined ? valores[indiceFallback] : "";
-        }
-
         function atualizarPainel() {
-            const inputData = document.getElementById('filtro-data');
-            const dataSelecionada = inputData ? inputData.value : '';
+            const dataSelecionada = document.getElementById('filtro-data').value; // Formato YYYY-MM-DD
             const termoBusca = document.getElementById('busca-geral').value.toLowerCase();
 
-            // Filtro por data rigoroso
+            // Filtrar agendamentos que caem na data selecionada
             const agendamentosDoDia = dadosGlobais.filter(item => {
-                const dataBruta = extrairCampo(item, ["Data", "Date", "Dia"], 0);
-                const dataItemIso = normalizarDataParaIso(dataBruta);
-                return dataItemIso === dataSelecionada;
+                const dataItem = item["Data"] ? item["Data"].split('T')[0] : "";
+                return dataItem === dataSelecionada;
             });
 
-            // Veículos Ocupados
+            // Identificar quais veículos da frota oficial estão ocupados nesta data
             const veiculosOcupados = new Set();
             agendamentosDoDia.forEach(item => {
-                const veiculoNome = limparStr(extrairCampo(item, ["Veículo", "Veiculo", "Carro"], 3));
+                const veiculoNome = normalizarTexto(item["Veículo"]);
                 FROTA_OFICIAL.forEach(f => {
-                    if (limparStr(f) === veiculoNome || veiculoNome.includes(limparStr(f))) {
+                    if (normalizarTexto(f) === veiculoNome) {
                         veiculosOcupados.add(f);
                     }
                 });
             });
 
-            // Renderiza Grid de Veículos
+            // Renderizar Cards dos 3 Veículos
             const gridVeiculos = document.getElementById('grid-veiculos');
             gridVeiculos.innerHTML = '';
 
@@ -271,7 +171,9 @@
                 const ocupado = veiculosOcupados.has(veiculo);
                 const card = document.createElement('div');
                 card.className = `p-4 rounded-xl border transition-all ${
-                    ocupado ? 'bg-amber-50/60 border-amber-200' : 'bg-emerald-50/60 border-emerald-200'
+                    ocupado 
+                        ? 'bg-amber-50/60 border-amber-200' 
+                        : 'bg-emerald-50/60 border-emerald-200'
                 }`;
                 
                 card.innerHTML = `
@@ -283,46 +185,47 @@
                             ${ocupado ? 'Ocupado' : 'Disponível'}
                         </span>
                     </div>
-                    <p class="text-xs text-gray-500">${ocupado ? 'Em uso nesta data' : 'Disponível para uso'}</p>
+                    <p class="text-xs text-gray-500">${ocupado ? 'Agendado para esta data' : 'Disponível para uso'}</p>
                 `;
                 gridVeiculos.appendChild(card);
             });
 
-            // Filtro por termo de busca geral
+            // Filtrar tabela com base na busca geral
             const agendamentosFiltrados = agendamentosDoDia.filter(item => {
-                return JSON.stringify(item).toLowerCase().includes(termoBusca);
+                const linhaStr = JSON.stringify(item).toLowerCase();
+                return linhaStr.includes(termoBusca);
             });
 
-            // Renderiza Tabela
+            // Renderizar Tabela
             const tbody = document.getElementById('tabela-agendamentos');
             tbody.innerHTML = '';
             document.getElementById('contador-agendamentos').innerText = `${agendamentosFiltrados.length} agendamento(s) encontrado(s)`;
 
             if (agendamentosFiltrados.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="6" class="text-center py-6 text-gray-400">Nenhum agendamento encontrado para a data ${formatarDataBR(dataSelecionada)}.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="6" class="text-center py-6 text-gray-400">Nenhum agendamento encontrado para esta data.</td></tr>`;
                 return;
             }
 
-            agendamentosFiltrados.forEach(item => {
+            agendamentosFiltrados.iterrows = agendamentosFiltrados.forEach(item => {
                 const tr = document.createElement('tr');
                 tr.className = "hover:bg-gray-50/80 transition-colors";
 
-                const dataBruta = extrairCampo(item, ["Data", "Date", "Dia"], 0);
-                const horaInicioBruta = extrairCampo(item, ["Horário Início", "Horario Inicio", "Início", "Inicio", "Start"], 1);
-                const horaFimBruta = extrairCampo(item, ["Horário Fim", "Horario Fim", "Fim", "End"], 2);
-                const veiculoTexto = extrairCampo(item, ["Veículo", "Veiculo", "Carro"], 3);
-                const motoristaTexto = extrairCampo(item, ["Motorista/Solicitante", "Motorista", "Solicitante", "Nome"], 4);
-                const statusTexto = extrairCampo(item, ["STATUS", "Status", "Estado"], 5) || "Confirmado";
+                // Tratamento de horários (caso venham em formato ISO longo)
+                let horaInicio = item["Horário Início"] || "-";
+                if (horaInicio.includes('T')) horaInicio = horaInicio.split('T')[1].substring(0, 5);
+                
+                let horaFim = item["Horário Fim"] || "-";
+                if (horaFim.includes('T')) horaFim = horaFim.split('T')[1].substring(0, 5);
 
                 tr.innerHTML = `
-                    <td class="py-4 px-6 text-gray-600">${formatarDataBR(dataBruta)}</td>
-                    <td class="py-4 px-6 font-semibold text-gray-900">${veiculoTexto || "-"}</td>
-                    <td class="py-4 px-6 text-gray-700">${motoristaTexto || "-"}</td>
-                    <td class="py-4 px-6 text-gray-600">${formatarHoraExcel(horaInicioBruta)}</td>
-                    <td class="py-4 px-6 text-gray-600">${formatarHoraExcel(horaFimBruta)}</td>
+                    <td class="py-4 px-6 text-gray-600">${formatarDataBR(item["Data"])}</td>
+                    <td class="py-4 px-6 font-semibold text-gray-900">${item["Veículo"] || "-"}</td>
+                    <td class="py-4 px-6 text-gray-700">${item["Motorista/Solicitante"] || item["Motorista"] || "-"}</td>
+                    <td class="py-4 px-6 text-gray-600">${horaInicio}</td>
+                    <td class="py-4 px-6 text-gray-600">${horaFim}</td>
                     <td class="py-4 px-6">
                         <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-green-50 text-green-700 border border-green-200">
-                            <span class="w-1.5 h-1.5 rounded-full bg-green-500"></span> ${statusTexto}
+                            <span class="w-1.5 h-1.5 rounded-full bg-green-500"></span> Confirmado
                         </span>
                     </td>
                 `;
@@ -330,10 +233,13 @@
             });
         }
 
+        // Eventos de filtro
         document.getElementById('filtro-data').addEventListener('change', atualizarPainel);
-        document.getElementById('filtro-data').addEventListener('input', atualizarPainel);
         document.getElementById('busca-geral').addEventListener('input', atualizarPainel);
 
+        // Inicializar
+        carregarDados();
+        // Atualizar automaticamente a cada 5 minutos
         setInterval(carregarDados, 300000);
     </script>
 </body>
