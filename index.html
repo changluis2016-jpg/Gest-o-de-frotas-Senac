@@ -94,31 +94,43 @@
         Senac MT — Sistema Integrado de Gestão de Frotas &copy; 2026
     </footer>
 
-    <!-- Script Robusto para Conversão de Datas do Excel/AppSheet -->
+    <!-- Script com Diagnóstico na Consola e Conversor Ultra-Robusto -->
     <script>
         const FROTA_OFICIAL = ["ONIX-7B64", "ONIX-3G84", "L200"];
         let dadosGlobais = [];
 
+        // Define a data inicial no input como hoje, caso esteja vazio
         const hojeStr = new Date().toISOString().split('T')[0];
-        document.getElementById('filtro-data').value = hojeStr;
+        if (!document.getElementById('filtro-data').value) {
+            document.getElementById('filtro-data').value = hojeStr;
+        }
 
         async function carregarDados() {
             try {
                 const resposta = await fetch('data.json?' + new Date().getTime());
-                if (!resposta.ok) throw new Error('Erro ao carregar dados');
+                if (!resposta.ok) throw new Error('Erro ao carregar dados do data.json');
                 const json = await resposta.json();
                 
+                console.log("=== JSON Carregado com Sucesso ===", json);
+
                 if (Array.isArray(json)) {
                     dadosGlobais = json;
                 } else if (json.veiculos && Array.isArray(json.veiculos)) {
                     dadosGlobais = json.veiculos;
                 } else {
-                    dadosGlobais = [];
+                    // Tenta encontrar a primeira propriedade que seja um array dentro do JSON
+                    const chaveArray = Object.keys(json).find(k => Array.isArray(json[k]));
+                    dadosGlobais = chaveArray ? json[chaveArray] : [];
                 }
                 
+                console.log("Total de registos carregados:", dadosGlobais.length);
+                if(dadosGlobais.length > 0) {
+                    console.log("Exemplo do primeiro registo:", dadosGlobais[0]);
+                }
+
                 atualizarPainel();
             } catch (erro) {
-                console.error("Erro:", erro);
+                console.error("Erro ao carregar dados:", erro);
                 document.getElementById('txt-atualizacao').innerText = "Erro ao sincronizar";
             }
         }
@@ -128,12 +140,12 @@
             return String(str).trim().toUpperCase().replace(/\s+/g, '');
         }
 
-        // Converte números seriais do Excel, strings ISO ou formato brasileiro para YYYY-MM-DD
+        // Conversor universal de datas (ISO, DD/MM/YYYY, Número Serial do Excel)
         function normalizarDataParaIso(dataBruta) {
             if (dataBruta === null || dataBruta === undefined || dataBruta === "") return "";
             let str = String(dataBruta).trim();
 
-            // Se for número serial do Excel (ex: 45928)
+            // Se for número serial do Excel (ex: 45929)
             const num = Number(str);
             if (!isNaN(num) && num > 30000 && num < 60000) {
                 const dataExcel = new Date(Math.round((num - (25567 + 2)) * 86400 * 1000));
@@ -145,18 +157,20 @@
                 }
             }
 
-            // Se vier formato ISO (2026-09-28T00:00:00)
+            // Se vier formato ISO (2026-09-29T00:00:00.000Z)
             if (str.includes('T')) {
                 return str.split('T')[0];
             }
 
-            // Se vier no formato brasileiro (DD/MM/YYYY)
-            if (str.includes('/')) {
-                const partes = str.split('/');
+            // Se vier no formato brasileiro (DD/MM/YYYY ou DD-MM-YYYY)
+            if (str.includes('/') || (str.includes('-') && str.indexOf('-') === 2)) {
+                const separador = str.includes('/') ? '/' : '-';
+                const partes = str.split(separador);
                 if (partes.length === 3) {
                     let dia = partes[0].padStart(2, '0');
                     let mes = partes[1].padStart(2, '0');
                     let ano = partes[2];
+                    if (ano.length === 2) ano = '20' + ano;
                     return `${ano}-${mes}-${dia}`;
                 }
             }
@@ -224,6 +238,8 @@
         function atualizarPainel() {
             const dataSelecionada = document.getElementById('filtro-data').value; // YYYY-MM-DD
             const termoBusca = document.getElementById('busca-geral').value.toLowerCase();
+
+            console.log("Filtrando para a data (ISO):", dataSelecionada);
 
             const agendamentosDoDia = dadosGlobais.filter(item => {
                 const dataBruta = extrairCampo(item, ["Data", "Date", "Dia"], 0);
