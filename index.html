@@ -132,9 +132,8 @@
             return String(txt).trim().toUpperCase();
         }
 
-        // Leitura exata da data sem alteração de fuso horário UTC
         function normalizarDataParaIso(dataBruta) {
-            if (dataBruta === null || dataBruta === undefined || dataBruta === "") return "";
+            if (!dataBruta) return "";
             let str = String(dataBruta).trim();
 
             if (str.includes('T')) {
@@ -142,14 +141,14 @@
             }
 
             if (str.includes('/') || (str.includes('-') && str.indexOf('-') === 2)) {
-                const separador = str.includes('/') ? '/' : '-';
-                const partes = str.split(separador);
-                if (partes.length === 3) {
-                    let dia = partes[0].padStart(2, '0');
-                    let mes = partes[1].padStart(2, '0');
-                    let ano = partes[2];
-                    if (ano.length === 2) ano = '20' + ano;
-                    return `${ano}-${mes}-${dia}`;
+                const sep = str.includes('/') ? '/' : '-';
+                const p = str.split(sep);
+                if (p.length === 3) {
+                    let d = p[0].padStart(2, '0');
+                    let m = p[1].padStart(2, '0');
+                    let a = p[2];
+                    if (a.length === 2) a = '20' + a;
+                    return `${a}-${m}-${d}`;
                 }
             }
 
@@ -157,40 +156,36 @@
         }
 
         function formatarDataBR(dataIso) {
-            const isoLimpo = normalizarDataParaIso(dataIso);
-            const partes = isoLimpo.split('-');
-            if (partes.length === 3) {
-                return `${partes[2]}/${partes[1]}/${partes[0]}`;
-            }
-            return dataIso;
+            const iso = normalizarDataParaIso(dataIso);
+            const p = iso.split('-');
+            return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : dataIso;
         }
 
-        // Tratamento seguro para extrair o horário HH:MM perfeitamente do Excel
-        function formatarHora(valorHora) {
-            if (valorHora === null || valorHora === undefined || valorHora === "") return "-";
-            let strHora = String(valorHora).trim();
-            if (strHora === "0" || strHora === "0.0" || strHora === "--") return "00:00";
+        // Função de formatação tratada com nova ordem e nomenclatura única
+        function formatarHora(valor) {
+            if (valor === null || valor === undefined || valor === "") return "-";
+            let vStr = String(valor).trim();
+            if (vStr === "0" || vStr === "0.0" || vStr === "--") return "00:00";
 
-            if (strHora.includes('T')) {
-                const partesT = strHora.split('T');
-                if (partesT[1]) return partesT[1].substring(0, 5);
+            if (vStr.includes('T')) {
+                const ped = vStr.split('T');
+                if (ped[1]) return ped[1].substring(0, 5);
             }
 
-            // Tratamento otimizado sem texto duplicado
-            const matchHora = strHora.match(/^(\d{2}):(\d{2})/);
-            if (matchHora) {
-                return `${matchHora[1]}:${matchHora[2]}`;
+            const regExHora = vStr.match(/^(\d{2}):(\d{2})/);
+            if (regExHora) {
+                return `${regExHora[1]}:${regExHora[2]}`;
             }
 
-            const num = Number(strHora);
-            if (!isNaN(num) && num >= 0 && num < 1) {
-                const totalMinutos = Math.round(num * 24 * 60);
-                const horas = Math.floor(totalMinutos / 60);
-                const minutos = totalMinutos % 60;
-                return `${String(horas).padStart(2, '0')}:${String(minutos).padStart(2, '0')}`;
+            const nDecimal = Number(vStr);
+            if (!isNaN(nDecimal) && nDecimal >= 0 && nDecimal < 1) {
+                const mTotal = Math.round(nDecimal * 24 * 60);
+                const h = Math.floor(mTotal / 60);
+                const m = mTotal % 60;
+                return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
             }
 
-            return strHora;
+            return vStr;
         }
 
         function atualizarPainel() {
