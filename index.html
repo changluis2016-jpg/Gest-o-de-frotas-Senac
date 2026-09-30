@@ -94,7 +94,7 @@
         Senac MT — Sistema Integrado de Gestão de Frotas &copy; 2026
     </footer>
 
-    <!-- Script com Conversão Correta de Horas Decimais do Excel -->
+    <!-- Script Robusto para Horários -->
     <script>
         const FROTA_OFICIAL = ["ONIX-7B64", "ONIX-3G84", "L200"];
         let dadosGlobais = [];
@@ -139,28 +139,28 @@
             return dataIso;
         }
 
-        // Função mágica para converter hora do Excel (seja texto ou número decimal ex: 0.5 -> 12:00)
+        // Conversor seguro para horário decimal ou string do Excel
         function formatarHoraExcel(valorHora) {
-            if (valorHora === null || valorHora === undefined || valorHora === "") return "-";
+            if (valorHora === null || valorHora === undefined || valorHora === "" || valorHora === 0 || valorHora === "0") return "-";
             
             let strHora = String(valorHora).trim();
 
-            // Se vier em formato ISO completo (ex: 2026-09-29T13:30:00)
             if (strHora.includes('T')) {
                 strHora = strHora.split('T')[1].substring(0, 5);
-                return strHora;
+                return strHora === "00:00" ? "-" : strHora;
             }
 
-            // Se for um número decimal do Excel (ex: 0.5, 0.72916..., etc)
             const num = Number(strHora);
-            if (!isNaN(num) && num >= 0 && num < 1) {
-                const totalMinutos = Math.round(num * 24 * 60);
-                const horas = Math.floor(totalMinutos / 60);
-                const minutos = totalMinutos % 60;
-                return `${String(horas).padStart(2, '0')}:${String(minutos).padStart(2, '0')}`;
+            if (!isNaN(num)) {
+                if (num === 0) return "-";
+                if (num > 0 && num < 1) {
+                    const totalMinutos = Math.round(num * 24 * 60);
+                    const horas = Math.floor(totalMinutos / 60);
+                    const minutos = totalMinutos % 60;
+                    return `${String(horas).padStart(2, '0')}:${String(minutos).padStart(2, '0')}`;
+                }
             }
 
-            // Se já vier em formato texto "HH:mm" ou similar
             if (strHora.length >= 5) {
                 return strHora.substring(0, 5);
             }
@@ -172,14 +172,12 @@
             const dataSelecionada = document.getElementById('filtro-data').value; // YYYY-MM-DD
             const termoBusca = document.getElementById('busca-geral').value.toLowerCase();
 
-            // Filtrar agendamentos correspondentes à data selecionada
             const agendamentosDoDia = dadosGlobais.filter(item => {
                 const dataItemBruto = item["Data"] || item["data"] || Object.values(item)[2] || "";
                 const dataItem = String(dataItemBruto).split('T')[0];
                 return dataItem === dataSelecionada;
             });
 
-            // Verificar veículos ocupados
             const veiculosOcupados = new Set();
             agendamentosDoDia.forEach(item => {
                 const veiculoNome = limparStr(item["Veículo"] || item["veiculo"] || "");
@@ -217,13 +215,11 @@
                 gridVeiculos.appendChild(card);
             });
 
-            // Filtrar por busca geral
             const agendamentosFiltrados = agendamentosDoDia.filter(item => {
                 const linhaStr = JSON.stringify(item).toLowerCase();
                 return linhaStr.includes(termoBusca);
             });
 
-            // Renderizar Tabela
             const tbody = document.getElementById('tabela-agendamentos');
             tbody.innerHTML = '';
             document.getElementById('contador-agendamentos').innerText = `${agendamentosFiltrados.length} agendamento(s) encontrado(s)`;
@@ -237,8 +233,9 @@
                 const tr = document.createElement('tr');
                 tr.className = "hover:bg-gray-50/80 transition-colors";
 
-                const horaInicioBruta = item["Horário Início"] || item["Horario Inicio"] || item["Início"] || "";
-                const horaFimBruta = item["Horário Fim"] || item["Horario Fim"] || item["Fim"] || "";
+                // Procurar por chaves de início comuns enviadas pelo Power Automate/Excel
+                const horaInicioBruta = item["Horário Início"] || item["Horario Inicio"] || item["Início"] || item["Inicio"] || Object.values(item)[3] || "";
+                const horaFimBruta = item["Horário Fim"] || item["Horario Fim"] || item["Fim"] || Object.values(item)[4] || "";
 
                 const horaInicio = formatarHoraExcel(horaInicioBruta);
                 const horaFim = formatarHoraExcel(horaFimBruta);
