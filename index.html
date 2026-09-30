@@ -94,12 +94,11 @@
         Senac MT — Sistema Integrado de Gestão de Frotas &copy; 2026
     </footer>
 
-    <!-- Script Robusto atualizado para tratar horários -->
+    <!-- Script Robusto por Mapeamento Completo de Colunas -->
     <script>
         const FROTA_OFICIAL = ["ONIX-7B64", "ONIX-3G84", "L200"];
         let dadosGlobais = [];
 
-        // Definir a data de hoje como padrão
         const hojeStr = new Date().toISOString().split('T')[0];
         document.getElementById('filtro-data').value = hojeStr;
 
@@ -139,35 +138,27 @@
             return dataIso;
         }
 
-        // Conversor blindado para formatos de hora do Excel / Power Automate
         function formatarHoraExcel(valorHora) {
-            if (valorHora === null || valorHora === undefined || valorHora === "" || valorHora === 0 || valorHora === "0") return "-";
+            if (valorHora === null || valorHora === undefined || valorHora === "") return "-";
             
             let strHora = String(valorHora).trim();
+            if (strHora === "0" || strHora === "0.0") return "00:00";
 
-            // Se vier formato ISO ou data contendo 'T' (ex: 2026-09-29T18:00:00.000Z)
             if (strHora.includes('T')) {
                 const partesT = strHora.split('T');
-                if (partesT[1]) {
-                    return partesT[1].substring(0, 5);
-                }
+                if (partesT[1]) return partesT[1].substring(0, 5);
             }
 
-            // Se vier com formato completo de data no formato string ou similar
             if (strHora.includes(' ')) {
                 const partesEspaco = strHora.split(' ');
-                // Procurar qual parte parece uma hora (contém dois pontos)
                 for (let p of partesEspaco) {
-                    if (p.includes(':')) {
-                        return p.substring(0, 5);
-                    }
+                    if (p.includes(':')) return p.substring(0, 5);
                 }
             }
 
-            // Se for número decimal do Excel (ex: fração de dias)
             const num = Number(strHora);
             if (!isNaN(num)) {
-                if (num === 0) return "-";
+                if (num === 0) return "00:00";
                 if (num > 0 && num < 1) {
                     const totalMinutos = Math.round(num * 24 * 60);
                     const horas = Math.floor(totalMinutos / 60);
@@ -176,27 +167,44 @@
                 }
             }
 
-            // Se já vier no formato "HH:MM" ou "HH:MM:SS"
-            if (strHora.length >= 5) {
-                return strHora.substring(0, 5);
-            }
-
+            if (strHora.length >= 5) return strHora.substring(0, 5);
             return strHora;
         }
 
+        // Função auxiliar para encontrar propriedades no objeto JSON independentemente de maiúsculas, acentos ou ordem
+        function extrairCampo(item, chavesPossiveis, indiceArrayFallback) {
+            const chavesItem = Object.keys(item);
+            
+            // 1. Tentar encontrar por nome correspondente
+            for (let chaveP of chavesPossiveis) {
+                const chaveEncontrada = chavesItem.find(k => limparStr(k) === limparStr(chaveP) || limparStr(k).includes(limparStr(chaveP)));
+                if (chaveEncontrada && item[chaveEncontrada] !== undefined && item[chaveEncontrada] !== "") {
+                    return item[chaveEncontrada];
+                }
+            }
+
+            // 2. Fallback por índice no array de valores (caso o JSON venha como array plano ou objeto indexado)
+            const valoresArray = Object.values(item);
+            if (valoresArray[indiceArrayFallback] !== undefined) {
+                return valoresArray[indiceArrayFallback];
+            }
+
+            return "";
+        }
+
         function atualizarPainel() {
-            const dataSelecionada = document.getElementById('filtro-data').value; // YYYY-MM-DD
+            const dataSelecionada = document.getElementById('filtro-data').value;
             const termoBusca = document.getElementById('busca-geral').value.toLowerCase();
 
             const agendamentosDoDia = dadosGlobais.filter(item => {
-                const dataItemBruto = item["Data"] || item["data"] || Object.values(item)[0] || "";
-                const dataItem = String(dataItemBruto).split('T')[0];
+                const dataBruta = extrairCampo(item, ["Data", "Date", "Dia"], 0);
+                const dataItem = String(dataBruta).split('T')[0];
                 return dataItem === dataSelecionada;
             });
 
             const veiculosOcupados = new Set();
             agendamentosDoDia.forEach(item => {
-                const veiculoNome = limparStr(item["Veículo"] || item["veiculo"] || "");
+                const veiculoNome = limparStr(extrairCampo(item, ["Veículo", "Veiculo", "Carro"], 3));
                 FROTA_OFICIAL.forEach(f => {
                     if (limparStr(f) === veiculoNome || veiculoNome.includes(limparStr(f))) {
                         veiculosOcupados.add(f);
@@ -204,7 +212,6 @@
                 });
             });
 
-            // Renderizar Cards dos 3 Veículos
             const gridVeiculos = document.getElementById('grid-veiculos');
             gridVeiculos.innerHTML = '';
 
@@ -249,20 +256,19 @@
                 const tr = document.createElement('tr');
                 tr.className = "hover:bg-gray-50/80 transition-colors";
 
-                // Capturar colunas exatas do Excel
-                const horaInicioBruta = item["Horário Início"] || item["Horario Inicio"] || item["Início"] || item["Inicio"] || Object.values(item)[1] || "";
-                const horaFimBruta = item["Horário Fim"] || item["Horario Fim"] || item["Fim"] || Object.values(item)[2] || "";
+                const dataBruta = extrairCampo(item, ["Data", "Date", "Dia"], 0);
+                const horaInicioBruta = extrairCampo(item, ["Horário Início", "Horario Inicio", "Início", "Inicio", "Start"], 1);
+                const horaFimBruta = extrairCampo(item, ["Horário Fim", "Horario Fim", "Fim", "End"], 2);
+                const veiculoTexto = extrairCampo(item, ["Veículo", "Veiculo", "Carro"], 3);
+                const motoristaTexto = extrairCampo(item, ["Motorista/Solicitante", "Motorista", "Solicitante", "Nome"], 4);
 
                 const horaInicio = formatarHoraExcel(horaInicioBruta);
                 const horaFim = formatarHoraExcel(horaFimBruta);
 
-                const veiculoTexto = item["Veículo"] || item["veiculo"] || "-";
-                const motoristaTexto = item["Motorista/Solicitante"] || item["Motorista"] || item["Solicitante"] || "-";
-
                 tr.innerHTML = `
-                    <td class="py-4 px-6 text-gray-600">${formatarDataBR(item["Data"] || item["data"])}</td>
-                    <td class="py-4 px-6 font-semibold text-gray-900">${veiculoTexto}</td>
-                    <td class="py-4 px-6 text-gray-700">${motoristaTexto}</td>
+                    <td class="py-4 px-6 text-gray-600">${formatarDataBR(dataBruta)}</td>
+                    <td class="py-4 px-6 font-semibold text-gray-900">${veiculoTexto || "-"}</td>
+                    <td class="py-4 px-6 text-gray-700">${motoristaTexto || "-"}</td>
                     <td class="py-4 px-6 text-gray-600">${horaInicio}</td>
                     <td class="py-4 px-6 text-gray-600">${horaFim}</td>
                     <td class="py-4 px-6">
