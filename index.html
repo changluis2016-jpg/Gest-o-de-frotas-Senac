@@ -99,7 +99,6 @@
         const FROTA_OFICIAL = ["ONIX-7B64", "ONIX-3G84", "L200"];
         let dadosGlobais = [];
 
-        // Definir a data de hoje como padrão no formato YYYY-MM-DD
         const hojeStr = new Date().toISOString().split('T')[0];
         const inputData = document.getElementById('filtro-data');
         if (inputData) inputData.value = hojeStr;
@@ -160,32 +159,25 @@
             return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : iso;
         }
 
-        // Função inteligente: Testa Coluna auxiliar (Coluna1/Coluna2), se falhar usa a coluna principal
-        function formatarHoraHibrida(valorAuxiliar, valorPrincipal) {
-            // 1. Tenta usar o valor auxiliar (Coluna1 ou Coluna2) se válido
-            if (valorAuxiliar !== null && valorAuxiliar !== undefined) {
-                let vAux = String(valorAuxiliar).trim();
-                if (vAux !== "" && vAux !== "--" && vAux !== "0" && vAux !== "NaN") {
-                    return vAux.length >= 5 ? vAux.substring(0, 5) : vAux;
-                }
-            }
+        // Leitura otimizada para os valores de texto vindos da Coluna C (Coluna1) e Coluna E (Coluna2)
+        function extrairHoraTexto(valor) {
+            if (valor === null || valor === undefined) return "--";
+            let vStr = String(valor).trim();
+            if (vStr === "" || vStr === "0" || vStr === "0.0" || vStr === "--" || vStr === "NaN") return "--";
 
-            // 2. Se a auxiliar estiver vazia, usa o valor principal
-            if (valorPrincipal === null || valorPrincipal === undefined || valorPrincipal === "") return "--";
-            let vStr = String(valorPrincipal).trim();
-            if (vStr === "0" || vStr === "0.0" || vStr === "--" || vStr === "NaN") return "--";
-
+            // Se vier formato ISO de data/hora
             if (vStr.includes('T')) {
                 const ped = vStr.split('T');
                 if (ped[1]) return ped[1].substring(0, 5);
             }
 
-            const matchHora = vStr.match(/^(\d{1,2}):(\d{2})/);
+            // Se for string de hora (ex: "13:30:00" ou "13:30")
+            const matchHora = vStr.match(/(\d{1,2}):(\d{2})/);
             if (matchHora) {
                 return `${matchHora[1].padStart(2, '0')}:${matchHora[2]}`;
             }
 
-            return vStr;
+            return vStr.length >= 5 ? vStr.substring(0, 5) : vStr;
         }
 
         function atualizarPainel() {
@@ -248,12 +240,13 @@
                 const tr = document.createElement('tr');
                 tr.className = "hover:bg-gray-50/80 transition-colors";
 
-                // Usa o método híbrido para garantir que o dia 30 e os demais apareçam perfeitamente
-                const horaInicio = formatarHoraHibrida(item["Coluna1"], item["Horário Início"] || item["Horario Inicio"]);
-                const horaFim = formatarHoraHibrida(item["Coluna2"], item["Horário Fim"] || item["Horario Fim"]);
+                // Pega estritamente da Coluna1 (Coluna C) para Início e Coluna2 (Coluna E) para Fim
+                const horaInicio = extrairHoraTexto(item["Coluna1"] !== undefined ? item["Coluna1"] : item["Horário Início"]);
+                const horaFim = extrairHoraTexto(item["Coluna2"] !== undefined ? item["Coluna2"] : item["Horário Fim"]);
 
                 const veiculoNome = item["Veículo"] || item["Veiculo"] || "-";
                 const motoristaNome = item["Motorista/Solicitante"] || item["Motorista"] || item["Solicitante"] || "-";
+                const statusStr = item["STATUS"] || item["Status"] || "CONFIRMADO";
 
                 tr.innerHTML = `
                     <td class="py-4 px-6 text-gray-600">${formatarDataBR(item)}</td>
@@ -263,7 +256,7 @@
                     <td class="py-4 px-6 text-gray-600">${horaFim}</td>
                     <td class="py-4 px-6">
                         <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-green-50 text-green-700 border border-green-200">
-                            <span class="w-1.5 h-1.5 rounded-full bg-green-500"></span> Confirmado
+                            <span class="w-1.5 h-1.5 rounded-full bg-green-500"></span> ${statusStr}
                         </span>
                     </td>
                 `;
