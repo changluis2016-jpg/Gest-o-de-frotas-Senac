@@ -44,7 +44,7 @@
                 <input type="date" id="filtro-data" class="bg-gray-50 border border-gray-300 text-gray-950 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 font-medium">
             </div>
             <div class="w-full md:w-72">
-                <input type="text" id="busca-geral" placeholder="Pesquisar motorista, veículo..." class="w-full bg-gray-50 border border-gray-300 text-sm rounded-lg p-2.5 focus:ring-blue-500 focus:border-blue-500">
+                <input type="text" id="busca-geral" placeholder="Pesquisar motorista, veículo, destino..." class="w-full bg-gray-50 border border-gray-300 text-sm rounded-lg p-2.5 focus:ring-blue-500 focus:border-blue-500">
             </div>
         </div>
 
@@ -77,6 +77,7 @@
                             <th class="py-3.5 px-6 font-semibold">Motorista / Solicitante</th>
                             <th class="py-3.5 px-6 font-semibold">Início</th>
                             <th class="py-3.5 px-6 font-semibold">Fim</th>
+                            <th class="py-3.5 px-6 font-semibold">Destino</th>
                             <th class="py-3.5 px-6 font-semibold">Status</th>
                         </tr>
                     </thead>
@@ -96,7 +97,7 @@
 
     <!-- Script de Processamento -->
     <script>
-        const FROTA_OFICIAL = ["ONIX-7B64", "ONIX-3G84", "L200"];
+        const FROTA_OFICIAL = ["ONIX-7B64", "ONIX-3G84", "L200", "VERSA", "DUCATO"];
         let dadosGlobais = [];
 
         const hojeStr = new Date().toISOString().split('T')[0];
@@ -164,7 +165,6 @@
             let vStr = String(valor).trim();
             if (vStr === "" || vStr === "--" || vStr === "0" || vStr === "0.0" || vStr === "NaN") return "--";
 
-            // Se vier como formato ISO com 'T' mas for data de erro do Excel (ex: 1901-01-09), ignora
             if (vStr.includes('T')) {
                 const ped = vStr.split('T');
                 if (ped[0].startsWith('1901') || ped[0].startsWith('1899')) {
@@ -189,7 +189,6 @@
                 return obterDataIso(item) === dataSelecionada;
             });
 
-            // Descobrir quais veículos da frota estão ocupados neste dia
             const veiculosOcupados = new Set();
             agendamentosDoDia.forEach(item => {
                 const veiculoNome = normalizarTexto(item["Veiculo"] || item["Veículo"]);
@@ -237,7 +236,7 @@
             document.getElementById('contador-agendamentos').innerText = `${agendamentosFiltrados.length} agendamento(s) encontrado(s)`;
 
             if (agendamentosFiltrados.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="6" class="text-center py-6 text-gray-400">Nenhum agendamento encontrado para esta data.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="7" class="text-center py-6 text-gray-400">Nenhum agendamento encontrado para esta data.</td></tr>`;
                 return;
             }
 
@@ -245,12 +244,12 @@
                 const tr = document.createElement('tr');
                 tr.className = "hover:bg-gray-50/80 transition-colors";
 
-                // Prioriza sempre as colunas limpas "HoraInicio" e "HoraFim", ignorando lixo das colunas antigas
                 const horaInicio = formatarHoraLimpa(item["HoraInicio"] !== undefined && item["HoraInicio"] !== "" ? item["HoraInicio"] : item["Horario Inicio"]);
                 const horaFim = formatarHoraLimpa(item["HoraFim"] !== undefined && item["HoraFim"] !== "" ? item["HoraFim"] : item["Horario Fim"]);
 
                 const veiculoNome = item["Veiculo"] || item["Veículo"] || "-";
                 const motoristaNome = item["Motorista"] || item["Motorista/Solicitante"] || "-";
+                const destinoNome = item["Destino"] || "-";
                 const statusStr = item["STATUS"] || item["Status"] || "EM ABERTO";
 
                 tr.innerHTML = `
@@ -259,6 +258,7 @@
                     <td class="py-4 px-6 text-gray-700">${motoristaNome}</td>
                     <td class="py-4 px-6 text-gray-600">${horaInicio}</td>
                     <td class="py-4 px-6 text-gray-600">${horaFim}</td>
+                    <td class="py-4 px-6 text-gray-700">${destinoNome}</td>
                     <td class="py-4 px-6">
                         <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-green-50 text-green-700 border border-green-200">
                             <span class="w-1.5 h-1.5 rounded-full bg-green-500"></span> ${statusStr}
@@ -275,7 +275,5 @@
         carregarDados();
         setInterval(carregarDados, 300000);
     </script>
-</body>
-</html>
 </body>
 </html>
