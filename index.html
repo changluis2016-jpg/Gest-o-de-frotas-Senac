@@ -96,7 +96,7 @@
 
     <!-- Script de Processamento -->
     <script>
-        const FROTA_OFICIAL = ["ONIX-7B64", "ONIX-3G84", "L200", "VERSA", "DUCATO"];
+        const FROTA_OFICIAL = ["ONIX-7B64", "ONIX-3G84", "L200"];
         let dadosGlobais = [];
 
         const hojeStr = new Date().toISOString().split('T')[0];
@@ -164,8 +164,12 @@
             let vStr = String(valor).trim();
             if (vStr === "" || vStr === "--" || vStr === "0" || vStr === "0.0" || vStr === "NaN") return "--";
 
+            // Se vier como formato ISO com 'T' mas for data de erro do Excel (ex: 1901-01-09), ignora
             if (vStr.includes('T')) {
                 const ped = vStr.split('T');
+                if (ped[0].startsWith('1901') || ped[0].startsWith('1899')) {
+                    return "--";
+                }
                 if (ped[1]) return ped[1].substring(0, 5);
             }
 
@@ -190,7 +194,6 @@
             agendamentosDoDia.forEach(item => {
                 const veiculoNome = normalizarTexto(item["Veiculo"] || item["Veículo"]);
                 const statusItem = normalizarTexto(item["STATUS"] || item["Status"]);
-                // Considera ocupado se não estiver cancelado
                 if (statusItem !== "CANCELADA" && statusItem !== "CANCELADO") {
                     FROTA_OFICIAL.forEach(f => {
                         if (normalizarTexto(f) === veiculoNome) {
@@ -242,9 +245,9 @@
                 const tr = document.createElement('tr');
                 tr.className = "hover:bg-gray-50/80 transition-colors";
 
-                // Leitura direta e limpa das colunas exatas HoraInicio e HoraFim
-                const horaInicio = formatarHoraLimpa(item["HoraInicio"] !== undefined ? item["HoraInicio"] : item["Horario Inicio"]);
-                const horaFim = formatarHoraLimpa(item["HoraFim"] !== undefined ? item["HoraFim"] : item["Horario Fim"]);
+                // Prioriza sempre as colunas limpas "HoraInicio" e "HoraFim", ignorando lixo das colunas antigas
+                const horaInicio = formatarHoraLimpa(item["HoraInicio"] !== undefined && item["HoraInicio"] !== "" ? item["HoraInicio"] : item["Horario Inicio"]);
+                const horaFim = formatarHoraLimpa(item["HoraFim"] !== undefined && item["HoraFim"] !== "" ? item["HoraFim"] : item["Horario Fim"]);
 
                 const veiculoNome = item["Veiculo"] || item["Veículo"] || "-";
                 const motoristaNome = item["Motorista"] || item["Motorista/Solicitante"] || "-";
@@ -272,5 +275,7 @@
         carregarDados();
         setInterval(carregarDados, 300000);
     </script>
+</body>
+</html>
 </body>
 </html>
