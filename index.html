@@ -193,6 +193,7 @@
             agendamentosDoDia.forEach(item => {
                 const veiculoNome = normalizarTexto(item["Veiculo"] || item["Veículo"]);
                 const statusItem = normalizarTexto(item["STATUS"] || item["Status"]);
+                // Veículo só fica ocupado se não estiver cancelado
                 if (statusItem !== "CANCELADA" && statusItem !== "CANCELADO") {
                     FROTA_OFICIAL.forEach(f => {
                         if (normalizarTexto(f) === veiculoNome) {
@@ -252,6 +253,15 @@
                 const destinoNome = item["Destino"] || "-";
                 const statusStr = item["STATUS"] || item["Status"] || "EM ABERTO";
 
+                const statusNorm = normalizarTexto(statusStr);
+                const isCancelado = statusNorm.includes("CANCELAD");
+
+                // Cores dinâmicas: Vermelho se cancelado, Verde se normal/aberto
+                const badgeStyle = isCancelado 
+                    ? "bg-red-50 text-red-700 border border-red-200" 
+                    : "bg-green-50 text-green-700 border border-green-200";
+                const dotStyle = isCancelado ? "bg-red-500" : "bg-green-500";
+
                 tr.innerHTML = `
                     <td class="py-4 px-6 text-gray-600">${formatarDataBR(item)}</td>
                     <td class="py-4 px-6 font-semibold text-gray-900">${veiculoNome}</td>
@@ -260,8 +270,8 @@
                     <td class="py-4 px-6 text-gray-600">${horaFim}</td>
                     <td class="py-4 px-6 text-gray-700">${destinoNome}</td>
                     <td class="py-4 px-6">
-                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-green-50 text-green-700 border border-green-200">
-                            <span class="w-1.5 h-1.5 rounded-full bg-green-500"></span> ${statusStr}
+                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${badgeStyle}">
+                            <span class="w-1.5 h-1.5 rounded-full ${dotStyle}"></span> ${statusStr}
                         </span>
                     </td>
                 `;
@@ -275,5 +285,7 @@
         carregarDados();
         setInterval(carregarDados, 300000);
     </script>
+</body>
+</html>
 </body>
 </html>
