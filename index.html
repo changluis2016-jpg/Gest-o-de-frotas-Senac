@@ -172,25 +172,73 @@
             document.getElementById('form-reserva').reset();
         }
 
+        // Função auxiliar para converter formato "HH:MM" para minutos totais
+        function h2min(horaStr) {
+            if (!horaStr || horaStr === "--") return 0;
+            const partes = horaStr.split(':');
+            return parseInt(partes[0], 10) * 60 + parseInt(partes[1], 10);
+        }
+
         async function salvarReserva(event) {
             event.preventDefault();
-            
+
+            const dataIso = document.getElementById('resData').value;
+            const inicio = document.getElementById('resInicio').value;
+            const fim = document.getElementById('resFim').value;
+            const veiculo = document.getElementById('resVeiculo').value;
+
+            // Converter horários para minutos para permitir a comparação
+            const inicioMin = h2min(inicio);
+            const fimMin = h2min(fim);
+
+            if (fimMin <= inicioMin) {
+                alert("O horário de término deve ser posterior ao horário de início.");
+                return;
+            }
+
+            // --- VALIDACAO DE CONFLITO DE HORÁRIOS ---
+            const conflito = dadosGlobais.find(item => {
+                const itemData = obterDataIso(item);
+                const itemVeiculo = normalizarTexto(item["Veiculo"] || item["Veículo"]);
+                const itemStatus = normalizarTexto(item["STATUS"] || item["Status"]);
+
+                // Ignora agendamentos cancelados
+                if (itemStatus.includes("CANCELAD")) return false;
+
+                // Verifica se é o mesmo veículo no mesmo dia
+                if (itemData === dataIso && itemVeiculo === normalizarTexto(veiculo)) {
+                    const itemInicioStr = formatarHoraLimpa(item["HoraInicio"] !== undefined && item["HoraInicio"] !== "" ? item["HoraInicio"] : item["Horario Inicio"]);
+                    const itemFimStr = formatarHoraLimpa(item["HoraFim"] !== undefined && item["HoraFim"] !== "" ? item["HoraFim"] : item["Horario Fim"]);
+
+                    const itemInicio = h2min(itemInicioStr);
+                    const itemFim = h2min(itemFimStr);
+
+                    // Fórmula para identificar sobreposição de intervalos
+                    return (inicioMin < itemFim) && (fimMin > itemInicio);
+                }
+                return false;
+            });
+
+            if (conflito) {
+                const solapInicio = formatarHoraLimpa(conflito["HoraInicio"] || conflito["Horario Inicio"]);
+                const solapFim = formatarHoraLimpa(conflito["HoraFim"] || conflito["Horario Fim"]);
+                const solicitante = conflito["Motorista"] || conflito["Motorista/Solicitante"] || "outro motorista";
+
+                alert(`⚠️ Veículo Indisponível!\n\nO veículo ${veiculo} já possui reserva confirmada para ${solicitante} no horário das ${solapInicio} às ${solapFim}.`);
+                return;
+            }
+
+            // --- ENVIO AO POWER AUTOMATE ---
             const btnSalvar = document.getElementById('btn-salvar');
             btnSalvar.disabled = true;
             btnSalvar.innerText = "Enviando...";
-
-            const inicio = document.getElementById('resInicio').value;
-            const fim = document.getElementById('resFim').value;
-
-            // Envia a data em formato ISO (YYYY-MM-DD) para evitar que o Excel inverta Dia por Mês
-            const dataIso = document.getElementById('resData').value;
 
             const dados = {
                 chaveSeguranca: MINHA_CHAVE,
                 data: dataIso,
                 horarioInicio: inicio.length === 5 ? inicio + ":00" : inicio,
                 horarioFim: fim.length === 5 ? fim + ":00" : fim,
-                veiculo: document.getElementById('resVeiculo').value,
+                veiculo: veiculo,
                 motorista: document.getElementById('resMotorista').value,
                 destino: document.getElementById('resDestino').value,
                 status: "EM ABERTO"
@@ -232,7 +280,7 @@
                 const resposta = await fetch('data.json?' + new Date().getTime());
                 if (!resposta.ok) throw new Error('Erro ao carregar dados');
                 const json = await resposta.json();
-                
+
                 if (Array.isArray(json)) {
                     dadosGlobais = json;
                 } else if (json.veiculos && Array.isArray(json.veiculos)) {
@@ -240,7 +288,7 @@
                 } else {
                     dadosGlobais = [];
                 }
-                
+
                 atualizarPainel();
             } catch (erro) {
                 console.error("Erro:", erro);
@@ -334,7 +382,7 @@
                 card.className = `p-4 rounded-xl border transition-all ${
                     ocupado ? 'bg-amber-50/60 border-amber-200' : 'bg-emerald-50/60 border-emerald-200'
                 }`;
-                
+
                 card.innerHTML = `
                     <div class="flex items-center justify-between mb-2">
                         <span class="font-bold text-gray-800 text-base">${veiculo}</span>
