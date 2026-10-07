@@ -186,6 +186,8 @@
             const inicio = document.getElementById('resInicio').value;
             const fim = document.getElementById('resFim').value;
             const veiculo = document.getElementById('resVeiculo').value;
+            const motorista = document.getElementById('resMotorista').value;
+            const destino = document.getElementById('resDestino').value;
 
             // Converter horários para minutos para permitir a comparação
             const inicioMin = h2min(inicio);
@@ -196,7 +198,7 @@
                 return;
             }
 
-            // --- VALIDACAO DE CONFLITO DE HORÁRIOS ---
+            // --- VALIDAÇÃO DE CONFLITO DE HORÁRIOS ---
             const conflito = dadosGlobais.find(item => {
                 const itemData = obterDataIso(item);
                 const itemVeiculo = normalizarTexto(item["Veiculo"] || item["Veículo"]);
@@ -239,8 +241,8 @@
                 horarioInicio: inicio.length === 5 ? inicio + ":00" : inicio,
                 horarioFim: fim.length === 5 ? fim + ":00" : fim,
                 veiculo: veiculo,
-                motorista: document.getElementById('resMotorista').value,
-                destino: document.getElementById('resDestino').value,
+                motorista: motorista,
+                destino: destino,
                 status: "EM ABERTO"
             };
 
@@ -253,8 +255,22 @@
 
                 if (response.ok) {
                     alert("Reserva cadastrada com sucesso no SharePoint!");
+
+                    // Atualização otimista: insere a nova reserva na memória da página imediatamente
+                    dadosGlobais.push({
+                        "Data": dataIso,
+                        "HoraInicio": inicio,
+                        "HoraFim": fim,
+                        "Veiculo": veiculo,
+                        "Motorista": motorista,
+                        "Destino": destino,
+                        "STATUS": "EM ABERTO"
+                    });
+
+                    // Atualiza a interface gráfica sem esperar pelo data.json
+                    atualizarPainel();
+
                     fecharModal();
-                    setTimeout(carregarDados, 2000);
                 } else {
                     alert("Erro ao cadastrar reserva. Verifique a chave de segurança.");
                 }
