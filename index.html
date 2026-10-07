@@ -12,11 +12,10 @@
 </head>
 <body class="bg-gray-50 text-gray-900 min-h-screen flex flex-col">
 
-    <!-- Header com Logo Bem Maior e Destaque Branco -->
+    <!-- Header com Logo e Destaque -->
     <header class="bg-blue-900 text-white shadow-md">
         <div class="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8 flex flex-col sm:flex-row justify-between items-center gap-4">
             <div class="flex items-center space-x-6">
-                <!-- Caixa branca com maior destaque e imagem bem aumentada -->
                 <div class="bg-white p-3.5 rounded-2xl shadow-md flex items-center justify-center">
                     <img src="LOGO%2080-01%20(1)COPIA.png" alt="Logo Senac Fecomércio Sesc 80 Anos" class="h-18 sm:h-20 w-auto object-contain">
                 </div>
@@ -26,7 +25,7 @@
                 </div>
             </div>
             <div class="flex items-center space-x-4">
-                <!-- Botão Administrador (Oculto por padrão, visível se a URL contiver ?admin=MinhaChaveFrotaSenac2026) -->
+                <!-- Botão de Administração (Visível apenas com ?admin=MinhaChaveFrotaSenac2026) -->
                 <button id="btn-nova-reserva" onclick="abrirModal()" class="hidden bg-amber-500 hover:bg-amber-600 text-blue-950 font-bold px-4 py-2 rounded-lg text-xs sm:text-sm shadow-md transition-all flex items-center gap-2 cursor-pointer">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
                     Nova Reserva
@@ -43,7 +42,7 @@
     <!-- Main Content -->
     <main class="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8 flex-grow w-full">
 
-        <!-- Controls: Date Filter & Search -->
+        <!-- Controles: Filtro de Data & Pesquisa -->
         <div class="bg-white rounded-xl shadow-sm p-5 mb-8 border border-gray-100 flex flex-col md:flex-row justify-between items-center gap-4">
             <div class="w-full md:w-auto flex flex-col sm:flex-row items-center gap-3">
                 <label for="filtro-data" class="font-semibold text-sm text-gray-700 flex items-center gap-2">
@@ -57,7 +56,7 @@
             </div>
         </div>
 
-        <!-- Fleet Status Section -->
+        <!-- Status da Frota -->
         <div class="bg-white rounded-xl shadow-sm p-6 mb-8 border border-gray-100">
             <h2 class="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
                 <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0"></path></svg>
@@ -68,7 +67,7 @@
             </div>
         </div>
 
-        <!-- Detailed Bookings Table -->
+        <!-- Tabela de Agendamentos -->
         <div class="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
             <div class="p-6 border-b border-gray-100 flex justify-between items-center">
                 <h2 class="text-lg font-bold text-gray-800 flex items-center gap-2">
@@ -156,7 +155,7 @@
         const URL_POWER_AUTOMATE = "https://default554116b687be480a9e3aa0e9e1a653.4b.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/27/workflows/f858fcba6dd548a9946b8025ccc1f7fc/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=axGW_UUbQ9kkDBOAovBn_IiY3JNrVdNosiDZXYVa7o4";
         const MINHA_CHAVE = "MinhaChaveFrotaSenac2026";
 
-        // Verifica se a chave de administrador foi passada na URL (ex: ?admin=MinhaChaveFrotaSenac2026)
+        // Verifica se a chave de administrador foi passada na URL (?admin=MinhaChaveFrotaSenac2026)
         const urlParams = new URLSearchParams(window.location.search);
         if (urlParams.get('admin') === MINHA_CHAVE) {
             const btnNova = document.getElementById('btn-nova-reserva');
@@ -183,14 +182,12 @@
             const inicio = document.getElementById('resInicio').value;
             const fim = document.getElementById('resFim').value;
 
-            // Converter data YYYY-MM-DD para DD/MM/YYYY para o Excel
+            // Envia a data em formato ISO (YYYY-MM-DD) para evitar que o Excel inverta Dia por Mês
             const dataIso = document.getElementById('resData').value;
-            const partesData = dataIso.split('-');
-            const dataFormatadaBR = `${partesData[2]}/${partesData[1]}/${partesData[0]}`;
 
             const dados = {
                 chaveSeguranca: MINHA_CHAVE,
-                data: dataFormatadaBR,
+                data: dataIso,
                 horarioInicio: inicio.length === 5 ? inicio + ":00" : inicio,
                 horarioFim: fim.length === 5 ? fim + ":00" : fim,
                 veiculo: document.getElementById('resVeiculo').value,
@@ -209,7 +206,7 @@
                 if (response.ok) {
                     alert("Reserva cadastrada com sucesso no SharePoint!");
                     fecharModal();
-                    setTimeout(carregarDados, 2000); // Recarrega os dados do painel
+                    setTimeout(carregarDados, 2000);
                 } else {
                     alert("Erro ao cadastrar reserva. Verifique a chave de segurança.");
                 }
