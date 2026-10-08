@@ -161,7 +161,7 @@
         Senac MT — Sistema Integrado de Gestão de Frotas &copy; 2026
     </footer>
 
-    <!-- Script de Processamento -->
+    <!-- Script de Processamento com Persistência Local -->
     <script>
         const URL_POWER_AUTOMATE = "https://default554116b687be480a9e3aa0e9e1a653.4b.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/27/workflows/f858fcba6dd548a9946b8025ccc1f7fc/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=axGW_UUbQ9kkDBOAovBn_IiY3JNrVdNosiDZXYVa7o4";
         const MINHA_CHAVE = "MinhaChaveFrotaSenac2026";
@@ -214,6 +214,21 @@
             if (!horaStr || horaStr === "--") return 0;
             const partes = horaStr.split(':');
             return parseInt(partes[0], 10) * 60 + parseInt(partes[1], 10);
+        }
+
+        // Funções para gerenciar persistência temporária local
+        function obterLocais() {
+            try {
+                return JSON.parse(localStorage.getItem('novos_agendamentos_senac') || '[]');
+            } catch (e) {
+                return [];
+            }
+        }
+
+        function salvarLocal(itemNovo) {
+            const locais = obterLocais();
+            locais.push(itemNovo);
+            localStorage.setItem('novos_agendamentos_senac', JSON.stringify(locais));
         }
 
         async function salvarReserva(event) {
@@ -305,28 +320,25 @@
                 if (response.ok) {
                     alert(isEdicao ? "Agendamento atualizado com sucesso!" : "Reserva cadastrada com sucesso!");
 
+                    const itemAtualizado = {
+                        "ID": idEdicao,
+                        "Data": dataIso,
+                        "HoraInicio": inicio,
+                        "HoraFim": fim,
+                        "Veiculo": veiculo,
+                        "Motorista": motorista,
+                        "Destino": destino,
+                        "STATUS": statusSelecao
+                    };
+
                     if (isEdicao) {
                         dadosGlobais[idxEdicao] = {
                             ...dadosGlobais[idxEdicao],
-                            "Data": dataIso,
-                            "HoraInicio": inicio,
-                            "HoraFim": fim,
-                            "Veiculo": veiculo,
-                            "Motorista": motorista,
-                            "Destino": destino,
-                            "STATUS": statusSelecao
+                            ...itemAtualizado
                         };
                     } else {
-                        dadosGlobais.push({
-                            "ID": idEdicao,
-                            "Data": dataIso,
-                            "HoraInicio": inicio,
-                            "HoraFim": fim,
-                            "Veiculo": veiculo,
-                            "Motorista": motorista,
-                            "Destino": destino,
-                            "STATUS": statusSelecao
-                        });
+                        dadosGlobais.push(itemAtualizado);
+                        salvarLocal(itemAtualizado); // Salva no navegador para não sumir ao sincronizar
                     }
 
                     atualizarPainel();
@@ -356,13 +368,27 @@
                 if (!resposta.ok) throw new Error('Erro ao carregar dados');
                 const json = await resposta.json();
 
+                let dadosServidor = [];
                 if (Array.isArray(json)) {
-                    dadosGlobais = json;
+                    dadosServidor = json;
                 } else if (json.veiculos && Array.isArray(json.veiculos)) {
-                    dadosGlobais = json.veiculos;
-                } else {
-                    dadosGlobais = [];
+                    dadosServidor = json.veiculos;
                 }
+
+                // Junta dados do servidor com novos agendamentos locais para não sumirem
+                const novosLocais = obterLocais();
+                dadosGlobais = [...dadosServidor];
+
+                novosLocais.forEach(itemLocal => {
+                    const jaExiste = dadosGlobais.some(itemServ => 
+                        obterDataIso(itemServ) === obterDataIso(itemLocal) &&
+                        normalizarTexto(itemServ["Veiculo"] || itemServ["Veículo"]) === normalizarTexto(itemLocal["Veiculo"]) &&
+                        formatarHoraLimpa(itemServ["HoraInicio"] || itemServ["Horario Inicio"]) === formatarHoraLimpa(itemLocal["HoraInicio"])
+                    );
+                    if (!jaExiste) {
+                        dadosGlobais.push(itemLocal);
+                    }
+                });
 
                 atualizarPainel();
             } catch (erro) {
