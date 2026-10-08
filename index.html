@@ -123,13 +123,22 @@
                         <input type="time" id="resFim" required class="w-full bg-gray-50 border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-blue-500 focus:border-blue-500">
                     </div>
                 </div>
-                <div>
-                    <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Veículo</label>
-                    <select id="resVeiculo" required class="w-full bg-gray-50 border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-blue-500 focus:border-blue-500">
-                        <option value="ONIX-7B64">ONIX-7B64</option>
-                        <option value="ONIX-3G84">ONIX-3G84</option>
-                        <option value="L200">L200</option>
-                    </select>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Veículo</label>
+                        <select id="resVeiculo" required class="w-full bg-gray-50 border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-blue-500 focus:border-blue-500">
+                            <option value="ONIX-7B64">ONIX-7B64</option>
+                            <option value="ONIX-3G84">ONIX-3G84</option>
+                            <option value="L200">L200</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Status</label>
+                        <select id="resStatus" required class="w-full bg-gray-50 border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-blue-500 focus:border-blue-500">
+                            <option value="EM ABERTO">EM ABERTO</option>
+                            <option value="CANCELADO">CANCELADO</option>
+                        </select>
+                    </div>
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Motorista / Solicitante</label>
@@ -172,6 +181,7 @@
             document.getElementById('btn-salvar').innerText = "Salvar na Planilha";
             document.getElementById('form-reserva').reset();
             document.getElementById('resData').value = document.getElementById('filtro-data').value || hojeStr;
+            document.getElementById('resStatus').value = "EM ABERTO";
             document.getElementById('modal-reserva').classList.remove('hidden');
         }
 
@@ -188,6 +198,7 @@
             document.getElementById('resInicio').value = formatarHoraLimpa(item["HoraInicio"] || item["Horario Inicio"]);
             document.getElementById('resFim').value = formatarHoraLimpa(item["HoraFim"] || item["Horario Fim"]);
             document.getElementById('resVeiculo').value = item["Veiculo"] || item["Veículo"];
+            document.getElementById('resStatus').value = normalizarTexto(item["STATUS"] || item["Status"]).includes("CANCELAD") ? "CANCELADO" : "EM ABERTO";
             document.getElementById('resMotorista').value = item["Motorista"] || item["Motorista/Solicitante"] || "";
             document.getElementById('resDestino').value = item["Destino"] || "";
 
@@ -216,6 +227,7 @@
             const inicio = document.getElementById('resInicio').value;
             const fim = document.getElementById('resFim').value;
             const veiculo = document.getElementById('resVeiculo').value;
+            const statusSelecao = document.getElementById('resStatus').value;
             const motorista = document.getElementById('resMotorista').value;
             const destino = document.getElementById('resDestino').value;
 
@@ -227,35 +239,37 @@
                 return;
             }
 
-            // Validação de Conflito de Horário
-            const conflito = dadosGlobais.find((item, index) => {
-                if (isEdicao && index === idxEdicao) return false;
+            // Validação de Conflito de Horário (Apenas se o agendamento NÃO estiver sendo Cancelado)
+            if (!normalizarTexto(statusSelecao).includes("CANCELAD")) {
+                const conflito = dadosGlobais.find((item, index) => {
+                    if (isEdicao && index === idxEdicao) return false;
 
-                const itemData = obterDataIso(item);
-                const itemVeiculo = normalizarTexto(item["Veiculo"] || item["Veículo"]);
-                const itemStatus = normalizarTexto(item["STATUS"] || item["Status"]);
+                    const itemData = obterDataIso(item);
+                    const itemVeiculo = normalizarTexto(item["Veiculo"] || item["Veículo"]);
+                    const itemStatus = normalizarTexto(item["STATUS"] || item["Status"]);
 
-                if (itemStatus.includes("CANCELAD")) return false;
+                    if (itemStatus.includes("CANCELAD")) return false;
 
-                if (itemData === dataIso && itemVeiculo === normalizarTexto(veiculo)) {
-                    const itemInicioStr = formatarHoraLimpa(item["HoraInicio"] !== undefined && item["HoraInicio"] !== "" ? item["HoraInicio"] : item["Horario Inicio"]);
-                    const itemFimStr = formatarHoraLimpa(item["HoraFim"] !== undefined && item["HoraFim"] !== "" ? item["HoraFim"] : item["Horario Fim"]);
+                    if (itemData === dataIso && itemVeiculo === normalizarTexto(veiculo)) {
+                        const itemInicioStr = formatarHoraLimpa(item["HoraInicio"] !== undefined && item["HoraInicio"] !== "" ? item["HoraInicio"] : item["Horario Inicio"]);
+                        const itemFimStr = formatarHoraLimpa(item["HoraFim"] !== undefined && item["HoraFim"] !== "" ? item["HoraFim"] : item["Horario Fim"]);
 
-                    const itemInicio = h2min(itemInicioStr);
-                    const itemFim = h2min(itemFimStr);
+                        const itemInicio = h2min(itemInicioStr);
+                        const itemFim = h2min(itemFimStr);
 
-                    return (inicioMin < itemFim) && (fimMin > itemInicio);
+                        return (inicioMin < itemFim) && (fimMin > itemInicio);
+                    }
+                    return false;
+                });
+
+                if (conflito) {
+                    const solapInicio = formatarHoraLimpa(conflito["HoraInicio"] || conflito["Horario Inicio"]);
+                    const solapFim = formatarHoraLimpa(conflito["HoraFim"] || conflito["Horario Fim"]);
+                    const solicitante = conflito["Motorista"] || conflito["Motorista/Solicitante"] || "outro motorista";
+
+                    alert(`⚠️ Veículo Indisponível!\n\nO veículo ${veiculo} já possui reserva confirmada para ${solicitante} no horário das ${solapInicio} às ${solapFim}.`);
+                    return;
                 }
-                return false;
-            });
-
-            if (conflito) {
-                const solapInicio = formatarHoraLimpa(conflito["HoraInicio"] || conflito["Horario Inicio"]);
-                const solapFim = formatarHoraLimpa(conflito["HoraFim"] || conflito["Horario Fim"]);
-                const solicitante = conflito["Motorista"] || conflito["Motorista/Solicitante"] || "outro motorista";
-
-                alert(`⚠️ Veículo Indisponível!\n\nO veículo ${veiculo} já possui reserva confirmada para ${solicitante} no horário das ${solapInicio} às ${solapFim}.`);
-                return;
             }
 
             const btnSalvar = document.getElementById('btn-salvar');
@@ -272,7 +286,7 @@
                 veiculo: veiculo,
                 motorista: motorista,
                 destino: destino,
-                status: "EM ABERTO"
+                status: statusSelecao
             };
 
             if (isEdicao) {
@@ -301,7 +315,7 @@
                             "Veiculo": veiculo,
                             "Motorista": motorista,
                             "Destino": destino,
-                            "STATUS": "EM ABERTO"
+                            "STATUS": statusSelecao
                         };
                     } else {
                         dadosGlobais.push({
@@ -312,7 +326,7 @@
                             "Veiculo": veiculo,
                             "Motorista": motorista,
                             "Destino": destino,
-                            "STATUS": "EM ABERTO"
+                            "STATUS": statusSelecao
                         });
                     }
 
