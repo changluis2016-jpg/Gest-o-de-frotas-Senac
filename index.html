@@ -195,12 +195,12 @@
             document.getElementById('btn-salvar').innerText = "Salvar Alterações";
 
             document.getElementById('resData').value = obterDataIso(item);
-            document.getElementById('resInicio').value = formatarHoraLimpa(item["HoraInicio"] || item["Horario Inicio"]);
-            document.getElementById('resFim').value = formatarHoraLimpa(item["HoraFim"] || item["Horario Fim"]);
-            document.getElementById('resVeiculo').value = item["Veiculo"] || item["Veículo"];
+            document.getElementById('resInicio').value = formatarHoraLimpa(item["HoraInicio"] || item["Horario Inicio"] || item["SAIDA"]);
+            document.getElementById('resFim').value = formatarHoraLimpa(item["HoraFim"] || item["Horario Fim"] || item["RETORNO"]);
+            document.getElementById('resVeiculo').value = item["Veiculo"] || item["Veículo"] || item["VEICULO"];
             document.getElementById('resStatus').value = normalizarTexto(item["STATUS"] || item["Status"]).includes("CANCELAD") ? "CANCELADO" : "EM ABERTO";
-            document.getElementById('resMotorista').value = item["Motorista"] || item["Motorista/Solicitante"] || "";
-            document.getElementById('resDestino').value = item["Destino"] || "";
+            document.getElementById('resMotorista').value = item["Motorista"] || item["Motorista/Solicitante"] || item["MOTORISTA"] || "";
+            document.getElementById('resDestino').value = item["Destino"] || item["DESTINO"] || "";
 
             document.getElementById('modal-reserva').classList.remove('hidden');
         }
@@ -227,7 +227,13 @@
 
         function salvarLocal(itemNovo) {
             const locais = obterLocais();
-            locais.push(itemNovo);
+            // Evita duplicados no localStorage comparando o ID ou combinações
+            const idx = locais.findIndex(l => (l.ID && itemNovo.ID && String(l.ID) === String(itemNovo.ID)));
+            if (idx >= 0) {
+                locais[idx] = itemNovo;
+            } else {
+                locais.push(itemNovo);
+            }
             localStorage.setItem('novos_agendamentos_senac', JSON.stringify(locais));
         }
 
@@ -259,14 +265,14 @@
                     if (isEdicao && index === idxEdicao) return false;
 
                     const itemData = obterDataIso(item);
-                    const itemVeiculo = normalizarTexto(item["Veiculo"] || item["Veículo"]);
+                    const itemVeiculo = normalizarTexto(item["Veiculo"] || item["Veículo"] || item["VEICULO"]);
                     const itemStatus = normalizarTexto(item["STATUS"] || item["Status"]);
 
                     if (itemStatus.includes("CANCELAD")) return false;
 
                     if (itemData === dataIso && itemVeiculo === normalizarTexto(veiculo)) {
-                        const itemInicioStr = formatarHoraLimpa(item["HoraInicio"] !== undefined && item["HoraInicio"] !== "" ? item["HoraInicio"] : item["Horario Inicio"]);
-                        const itemFimStr = formatarHoraLimpa(item["HoraFim"] !== undefined && item["HoraFim"] !== "" ? item["HoraFim"] : item["Horario Fim"]);
+                        const itemInicioStr = formatarHoraLimpa(item["HoraInicio"] || item["Horario Inicio"] || item["SAIDA"]);
+                        const itemFimStr = formatarHoraLimpa(item["HoraFim"] || item["Horario Fim"] || item["RETORNO"]);
 
                         const itemInicio = h2min(itemInicioStr);
                         const itemFim = h2min(itemFimStr);
@@ -277,9 +283,9 @@
                 });
 
                 if (conflito) {
-                    const solapInicio = formatarHoraLimpa(conflito["HoraInicio"] || conflito["Horario Inicio"]);
-                    const solapFim = formatarHoraLimpa(conflito["HoraFim"] || conflito["Horario Fim"]);
-                    const solicitante = conflito["Motorista"] || conflito["Motorista/Solicitante"] || "outro motorista";
+                    const solapInicio = formatarHoraLimpa(conflito["HoraInicio"] || conflito["Horario Inicio"] || conflito["SAIDA"]);
+                    const solapFim = formatarHoraLimpa(conflito["HoraFim"] || conflito["Horario Fim"] || conflito["RETORNO"]);
+                    const solicitante = conflito["Motorista"] || conflito["Motorista/Solicitante"] || conflito["MOTORISTA"] || "outro motorista";
 
                     alert(`⚠️ Veículo Indisponível!\n\nO veículo ${veiculo} já possui reserva confirmada para ${solicitante} no horário das ${solapInicio} às ${solapFim}.`);
                     return;
@@ -306,8 +312,8 @@
             if (isEdicao) {
                 const itemAntigo = dadosGlobais[idxEdicao];
                 payload.dataAntiga = obterDataIso(itemAntigo);
-                payload.veiculoAntigo = itemAntigo["Veiculo"] || itemAntigo["Veículo"];
-                payload.horaInicioAntiga = formatarHoraLimpa(itemAntigo["HoraInicio"] || itemAntigo["Horario Inicio"]);
+                payload.veiculoAntigo = itemAntigo["Veiculo"] || itemAntigo["Veículo"] || itemAntigo["VEICULO"];
+                payload.horaInicioAntiga = formatarHoraLimpa(itemAntigo["HoraInicio"] || itemAntigo["Horario Inicio"] || itemAntigo["SAIDA"]);
             }
 
             try {
@@ -323,24 +329,31 @@
                     const itemAtualizado = {
                         "ID": idEdicao,
                         "Data": dataIso,
+                        "DATA": dataIso,
                         "HoraInicio": inicio,
+                        "SAIDA": inicio,
                         "HoraFim": fim,
+                        "RETORNO": fim,
                         "Veiculo": veiculo,
+                        "VEICULO": veiculo,
                         "Motorista": motorista,
+                        "MOTORISTA": motorista,
                         "Destino": destino,
+                        "DESTINO": destino,
                         "STATUS": statusSelecao
                     };
 
                     if (isEdicao) {
+                        // Atualização direta do objeto existente no array para evitar duplicação na interface
                         dadosGlobais[idxEdicao] = {
                             ...dadosGlobais[idxEdicao],
                             ...itemAtualizado
                         };
                     } else {
                         dadosGlobais.push(itemAtualizado);
-                        salvarLocal(itemAtualizado); // Salva no navegador para não sumir ao sincronizar
                     }
 
+                    salvarLocal(itemAtualizado);
                     atualizarPainel();
                     fecharModal();
                 } else {
@@ -375,18 +388,35 @@
                     dadosServidor = json.veiculos;
                 }
 
-                // Junta dados do servidor com novos agendamentos locais para não sumirem
-                const novosLocais = obterLocais();
+                // Carrega os itens do servidor
                 dadosGlobais = [...dadosServidor];
 
+                // Junta com os locais sem duplicar se o ID já existir
+                const novosLocais = obterLocais();
                 novosLocais.forEach(itemLocal => {
-                    const jaExiste = dadosGlobais.some(itemServ => 
-                        obterDataIso(itemServ) === obterDataIso(itemLocal) &&
-                        normalizarTexto(itemServ["Veiculo"] || itemServ["Veículo"]) === normalizarTexto(itemLocal["Veiculo"]) &&
-                        formatarHoraLimpa(itemServ["HoraInicio"] || itemServ["Horario Inicio"]) === formatarHoraLimpa(itemLocal["HoraInicio"])
-                    );
-                    if (!jaExiste) {
-                        dadosGlobais.push(itemLocal);
+                    const localId = itemLocal["ID"] || itemLocal["id"];
+                    let indexExistente = -1;
+
+                    if (localId) {
+                        indexExistente = dadosGlobais.findIndex(itemServ => {
+                            const servId = itemServ["ID"] || itemServ["id"];
+                            return servId && String(servId) === String(localId);
+                        });
+                    }
+
+                    if (indexExistente >= 0) {
+                        // Sobrescreve com a versão local mais recente
+                        dadosGlobais[indexExistente] = { ...dadosGlobais[indexExistente], ...itemLocal };
+                    } else {
+                        // Verifica se existe por chave combinada caso não haja ID
+                        const jaExistePorCampos = dadosGlobais.some(itemServ => 
+                            obterDataIso(itemServ) === obterDataIso(itemLocal) &&
+                            normalizarTexto(itemServ["Veiculo"] || itemServ["Veículo"] || itemServ["VEICULO"]) === normalizarTexto(itemLocal["Veiculo"] || itemLocal["VEICULO"]) &&
+                            formatarHoraLimpa(itemServ["HoraInicio"] || itemServ["Horario Inicio"] || itemServ["SAIDA"]) === formatarHoraLimpa(itemLocal["HoraInicio"] || itemLocal["SAIDA"])
+                        );
+                        if (!jaExistePorCampos) {
+                            dadosGlobais.push(itemLocal);
+                        }
                     }
                 });
 
@@ -404,7 +434,7 @@
         }
 
         function obterDataIso(item) {
-            const dataBruta = item["Data"] || item["Date"] || item["Dia"] || "";
+            const dataBruta = item["Data"] || item["DATA"] || item["Date"] || item["Dia"] || "";
             let str = String(dataBruta).trim();
 
             if (str.includes('T')) return str.substring(0, 10);
@@ -457,7 +487,7 @@
 
             const veiculosOcupados = new Set();
             agendamentosDoDia.forEach(item => {
-                const veiculoNome = normalizarTexto(item["Veiculo"] || item["Veículo"]);
+                const veiculoNome = normalizarTexto(item["Veiculo"] || item["Veículo"] || item["VEICULO"]);
                 const statusItem = normalizarTexto(item["STATUS"] || item["Status"]);
                 if (statusItem !== "CANCELADA" && statusItem !== "CANCELADO") {
                     FROTA_OFICIAL.forEach(f => {
@@ -508,12 +538,12 @@
                 const tr = document.createElement('tr');
                 tr.className = "hover:bg-gray-50/80 transition-colors";
 
-                const horaInicio = formatarHoraLimpa(item["HoraInicio"] !== undefined && item["HoraInicio"] !== "" ? item["HoraInicio"] : item["Horario Inicio"]);
-                const horaFim = formatarHoraLimpa(item["HoraFim"] !== undefined && item["HoraFim"] !== "" ? item["HoraFim"] : item["Horario Fim"]);
+                const horaInicio = formatarHoraLimpa(item["HoraInicio"] || item["Horario Inicio"] || item["SAIDA"]);
+                const horaFim = formatarHoraLimpa(item["HoraFim"] || item["Horario Fim"] || item["RETORNO"]);
 
-                const veiculoNome = item["Veiculo"] || item["Veículo"] || "-";
-                const motoristaNome = item["Motorista"] || item["Motorista/Solicitante"] || "-";
-                const destinoNome = item["Destino"] || "-";
+                const veiculoNome = item["Veiculo"] || item["Veículo"] || item["VEICULO"] || "-";
+                const motoristaNome = item["Motorista"] || item["Motorista/Solicitante"] || item["MOTORISTA"] || "-";
+                const destinoNome = item["Destino"] || item["DESTINO"] || "-";
                 const statusStr = item["STATUS"] || item["Status"] || "EM ABERTO";
 
                 const statusNorm = normalizarTexto(statusStr);
