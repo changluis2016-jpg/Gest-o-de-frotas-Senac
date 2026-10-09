@@ -161,7 +161,7 @@
         Senac MT — Sistema Integrado de Gestão de Frotas &copy; 2026
     </footer>
 
-    <!-- Script de Processamento com Persistência Local -->
+    <!-- Script de Processamento -->
     <script>
         const URL_POWER_AUTOMATE = "https://default554116b687be480a9e3aa0e9e1a653.4b.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/27/workflows/f858fcba6dd548a9946b8025ccc1f7fc/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=axGW_UUbQ9kkDBOAovBn_IiY3JNrVdNosiDZXYVa7o4";
         const MINHA_CHAVE = "MinhaChaveFrotaSenac2026";
@@ -214,27 +214,6 @@
             if (!horaStr || horaStr === "--") return 0;
             const partes = horaStr.split(':');
             return parseInt(partes[0], 10) * 60 + parseInt(partes[1], 10);
-        }
-
-        // Funções para gerenciar persistência temporária local
-        function obterLocais() {
-            try {
-                return JSON.parse(localStorage.getItem('novos_agendamentos_senac') || '[]');
-            } catch (e) {
-                return [];
-            }
-        }
-
-        function salvarLocal(itemNovo) {
-            const locais = obterLocais();
-            // Evita duplicados no localStorage comparando o ID ou combinações
-            const idx = locais.findIndex(l => (l.ID && itemNovo.ID && String(l.ID) === String(itemNovo.ID)));
-            if (idx >= 0) {
-                locais[idx] = itemNovo;
-            } else {
-                locais.push(itemNovo);
-            }
-            localStorage.setItem('novos_agendamentos_senac', JSON.stringify(locais));
         }
 
         async function salvarReserva(event) {
@@ -344,7 +323,6 @@
                     };
 
                     if (isEdicao) {
-                        // Atualização direta do objeto existente no array para evitar duplicação na interface
                         dadosGlobais[idxEdicao] = {
                             ...dadosGlobais[idxEdicao],
                             ...itemAtualizado
@@ -353,7 +331,6 @@
                         dadosGlobais.push(itemAtualizado);
                     }
 
-                    salvarLocal(itemAtualizado);
                     atualizarPainel();
                     fecharModal();
                 } else {
@@ -377,6 +354,7 @@
 
         async function carregarDados() {
             try {
+                // Força o carregamento sem cache
                 const resposta = await fetch('data.json?' + new Date().getTime());
                 if (!resposta.ok) throw new Error('Erro ao carregar dados');
                 const json = await resposta.json();
@@ -388,37 +366,14 @@
                     dadosServidor = json.veiculos;
                 }
 
-                // Carrega os itens do servidor
+                // 100% dos dados vêm do SharePoint/data.json
                 dadosGlobais = [...dadosServidor];
 
-                // Junta com os locais sem duplicar se o ID já existir
-                const novosLocais = obterLocais();
-                novosLocais.forEach(itemLocal => {
-                    const localId = itemLocal["ID"] || itemLocal["id"];
-                    let indexExistente = -1;
+                // Limpa vestígios antigos do navegador para evitar itens duplicados fantasmas
+                localStorage.clear();
 
-                    if (localId) {
-                        indexExistente = dadosGlobais.findIndex(itemServ => {
-                            const servId = itemServ["ID"] || itemServ["id"];
-                            return servId && String(servId) === String(localId);
-                        });
-                    }
-
-                    if (indexExistente >= 0) {
-                        // Sobrescreve com a versão local mais recente
-                        dadosGlobais[indexExistente] = { ...dadosGlobais[indexExistente], ...itemLocal };
-                    } else {
-                        // Verifica se existe por chave combinada caso não haja ID
-                        const jaExistePorCampos = dadosGlobais.some(itemServ => 
-                            obterDataIso(itemServ) === obterDataIso(itemLocal) &&
-                            normalizarTexto(itemServ["Veiculo"] || itemServ["Veículo"] || itemServ["VEICULO"]) === normalizarTexto(itemLocal["Veiculo"] || itemLocal["VEICULO"]) &&
-                            formatarHoraLimpa(itemServ["HoraInicio"] || itemServ["Horario Inicio"] || itemServ["SAIDA"]) === formatarHoraLimpa(itemLocal["HoraInicio"] || itemLocal["SAIDA"])
-                        );
-                        if (!jaExistePorCampos) {
-                            dadosGlobais.push(itemLocal);
-                        }
-                    }
-                });
+                const txtAtualizacao = document.getElementById('txt-atualizacao');
+                if (txtAtualizacao) txtAtualizacao.innerText = "Sincronizado com SharePoint";
 
                 atualizarPainel();
             } catch (erro) {
@@ -586,6 +541,9 @@
 
         document.getElementById('filtro-data').addEventListener('change', atualizarPainel);
         document.getElementById('busca-geral').addEventListener('input', atualizarPainel);
+
+        // Limpa o localStorage ao abrir a página
+        localStorage.clear();
 
         carregarDados();
         setInterval(carregarDados, 300000);
